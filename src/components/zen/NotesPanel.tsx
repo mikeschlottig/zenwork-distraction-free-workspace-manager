@@ -24,7 +24,7 @@ function NoteCard({ note, workspaceId, onUpdate, onDelete }: NoteCardProps) {
   useEffect(() => {
     if (title !== note.title) setTitle(note.title);
     if (content !== note.content) setContent(note.content);
-  }, [note.title, note.content, title, content]);
+  }, [note.title, note.content]);
   const performSave = useCallback(async (t: string, c: string) => {
     setIsSaving(true);
     try {
@@ -40,7 +40,6 @@ function NoteCard({ note, workspaceId, onUpdate, onDelete }: NoteCardProps) {
       setIsSaving(false);
     }
   }, [workspaceId, onUpdate, note.id]);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     const timer = setTimeout(() => {
       if (title !== note.title || content !== note.content) {
@@ -48,7 +47,7 @@ function NoteCard({ note, workspaceId, onUpdate, onDelete }: NoteCardProps) {
       }
     }, 800);
     return () => clearTimeout(timer);
-  }, [title, content, performSave]);
+  }, [title, content, performSave, note.title, note.content]);
   return (
     <Card className="bg-slate-900/40 border-slate-800 hover:border-slate-700 transition-colors shadow-lg">
       <CardHeader className="p-4 pb-2 space-y-2">
