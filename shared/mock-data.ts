@@ -17,6 +17,21 @@ export const MOCK_WORKSPACES: Workspace[] = [
       { id: 't2', text: 'Add drag and drop to resources', completed: false, createdAt: Date.now() },
     ],
     groups: [],
+    kanban: {
+      columns: [
+        {
+          id: 'col-1',
+          name: 'To Do',
+          order: 0,
+          cards: [
+            { id: 'c1', title: 'Design Landing Page', description: 'Create high-fidelity mockups', labels: ['Design', 'High Priority'], order: 0 },
+            { id: 'c2', title: 'Setup Database Schema', description: 'Define tables and relations', labels: ['Dev'], order: 1 }
+          ]
+        },
+        { id: 'col-2', name: 'In Progress', order: 1, cards: [] },
+        { id: 'col-3', name: 'Done', order: 2, cards: [] }
+      ]
+    },
     layout: { columns: 1, resourceOrder: ['r1', 'r2'], notesViewMode: 'cards' },
     createdAt: Date.now(),
   },
@@ -34,6 +49,12 @@ export const MOCK_WORKSPACES: Workspace[] = [
     ],
     tasks: [],
     groups: [],
+    kanban: {
+      columns: [
+        { id: 'col-a', name: 'To Do', order: 0, cards: [] },
+        { id: 'col-b', name: 'In Progress', order: 1, cards: [] }
+      ]
+    },
     layout: { columns: 1, resourceOrder: ['r3'], notesViewMode: 'cards' },
     createdAt: Date.now(),
   }

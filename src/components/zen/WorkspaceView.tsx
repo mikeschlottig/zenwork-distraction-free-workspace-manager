@@ -1,21 +1,22 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ResourceList } from './ResourceList';
 import { NotesPanel } from './NotesPanel';
 import { TaskBoard } from './TaskBoard';
+import { KanbanBoard } from './KanbanBoard';
 import type { Workspace } from '@shared/types';
-import { Search, Share2, MoreHorizontal, LayoutGrid, Trash2, Settings2, Check, RefreshCw } from 'lucide-react';
+import { Search, Share2, MoreHorizontal, LayoutGrid, Trash2, Settings2, Check, RefreshCw, Layout } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
 import { api } from '@/lib/api-client';
-import { cn } from '@/lib/utils';
 interface WorkspaceViewProps {
   workspace: Workspace;
   onUpdate: (ws: Workspace) => void;
   onDelete: (id: string) => void;
+  onMoveRequest?: (resourceId: string, targetWsId: string) => void;
 }
-export function WorkspaceView({ workspace, onUpdate, onDelete }: WorkspaceViewProps) {
+export function WorkspaceView({ workspace, onUpdate, onDelete, onMoveRequest }: WorkspaceViewProps) {
   const safeLayout = React.useMemo(() => ({
     columns: workspace.layout?.columns ?? 1,
     resourceOrder: workspace.layout?.resourceOrder ?? [],
@@ -43,12 +44,12 @@ export function WorkspaceView({ workspace, onUpdate, onDelete }: WorkspaceViewPr
     try {
       const updated = await api<Workspace>(`/api/workspaces/${workspace.id}`, {
         method: 'PATCH',
-        body: JSON.stringify({ 
-          layout: { 
-            columns: 1, 
-            resourceOrder: [], 
-            notesViewMode: 'cards' 
-          } 
+        body: JSON.stringify({
+          layout: {
+            columns: 1,
+            resourceOrder: [],
+            notesViewMode: 'cards'
+          }
         }),
       });
       onUpdate(updated);
@@ -136,13 +137,17 @@ export function WorkspaceView({ workspace, onUpdate, onDelete }: WorkspaceViewPr
           <div className="pt-4 mb-6">
             <TabsList className="bg-slate-900 border border-slate-800 p-1 rounded-xl">
               <TabsTrigger value="resources" className="rounded-lg data-[state=active]:bg-slate-800 data-[state=active]:text-blue-400 transition-all px-6">Resources</TabsTrigger>
-              <TabsTrigger value="notes" className="rounded-lg data-[state=active]:bg-slate-800 data-[state=active]:text-fuchsia-400 transition-all px-6">Notes</TabsTrigger>
+              <TabsTrigger value="kanban" className="rounded-lg data-[state=active]:bg-slate-800 data-[state=active]:text-fuchsia-400 transition-all px-6">Board</TabsTrigger>
+              <TabsTrigger value="notes" className="rounded-lg data-[state=active]:bg-slate-800 data-[state=active]:text-amber-400 transition-all px-6">Notes</TabsTrigger>
               <TabsTrigger value="tasks" className="rounded-lg data-[state=active]:bg-slate-800 data-[state=active]:text-emerald-400 transition-all px-6">Tasks</TabsTrigger>
             </TabsList>
           </div>
           <div className="flex-1 pb-10">
             <TabsContent value="resources" className="m-0 focus-visible:ring-0">
-              <ResourceList workspaceId={workspace.id} layout={safeLayout} />
+              <ResourceList workspaceId={workspace.id} layout={safeLayout} onMoveRequest={onMoveRequest} />
+            </TabsContent>
+            <TabsContent value="kanban" className="m-0 focus-visible:ring-0">
+              <KanbanBoard workspace={workspace} onUpdate={onUpdate} />
             </TabsContent>
             <TabsContent value="notes" className="m-0 focus-visible:ring-0">
               <NotesPanel workspace={workspace} onUpdate={onUpdate} />

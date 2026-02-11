@@ -21,9 +21,26 @@ export interface ResourceGroup {
   name: string;
   order: number;
 }
+export interface KanbanCard {
+  id: string;
+  title: string;
+  description?: string;
+  labels: string[];
+  dueDate?: number;
+  order: number;
+}
+export interface KanbanColumn {
+  id: string;
+  name: string;
+  order: number;
+  cards: KanbanCard[];
+}
+export interface KanbanBoardData {
+  columns: KanbanColumn[];
+}
 export interface WorkspaceLayout {
   columns: number;
-  resourceOrder: string[]; // IDs in order
+  resourceOrder: string[]; 
   notesViewMode?: 'cards' | 'table';
 }
 export interface Workspace {
@@ -32,6 +49,7 @@ export interface Workspace {
   notes: Note[];
   tasks: Task[];
   groups: ResourceGroup[];
+  kanban: KanbanBoardData;
   layout: WorkspaceLayout;
   createdAt: number;
 }

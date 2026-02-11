@@ -10,6 +10,9 @@ export class WorkspaceEntity extends IndexedEntity<Workspace> {
     notes: [],
     tasks: [],
     groups: [],
+    kanban: {
+      columns: []
+    },
     layout: {
       columns: 1,
       resourceOrder: [],
