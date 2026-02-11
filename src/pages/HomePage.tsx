@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
+import { Zap, Loader2 } from 'lucide-react';
 import { Sidebar } from '@/components/zen/Sidebar';
 import { WorkspaceView } from '@/components/zen/WorkspaceView';
 import { Toaster } from '@/components/ui/sonner';
+import { Button } from '@/components/ui/button';
 import { api } from '@/lib/api-client';
 import type { Workspace } from '@shared/types';
-import { Loader2 } from 'lucide-react';
 import { DndContext, DragEndEvent, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { toast } from 'sonner';
 export function HomePage() {
@@ -19,9 +20,12 @@ export function HomePage() {
       try {
         const data = await api<Workspace[]>('/api/workspaces');
         setWorkspaces(data);
-        if (data.length > 0) setActiveId(data[0].id);
+        if (data && data.length > 0) {
+          setActiveId(data[0].id);
+        }
       } catch (err) {
         console.error('Failed to load workspaces', err);
+        toast.error('Failed to load workspaces');
       } finally {
         setIsLoading(false);
       }
@@ -50,7 +54,9 @@ export function HomePage() {
       await api(`/api/workspaces/${id}`, { method: 'DELETE' });
       const remaining = workspaces.filter(w => w.id !== id);
       setWorkspaces(remaining);
-      if (activeId === id) setActiveId(remaining[0]?.id || null);
+      if (activeId === id) {
+        setActiveId(remaining.length > 0 ? remaining[0].id : null);
+      }
       toast.success('Workspace deleted');
     } catch (err) {
       toast.error('Failed to delete workspace');
@@ -70,10 +76,7 @@ export function HomePage() {
             body: JSON.stringify({ workspaceId: targetWsId })
           });
           toast.success('Moved resource to new space');
-          // Update local state if we want to reflect it immediately without reload
-          // This is complex as it affects resources not workspaces directly, 
-          // but ResourceList fetches based on workspaceId.
-          // Force a reload of active view's resources is easier by triggering a minor change
+          // Refresh active workspace to update local resource list
           if (activeId) {
              const reloadWs = await api<Workspace>(`/api/workspaces/${activeId}`);
              handleUpdateWorkspace(reloadWs);
@@ -103,8 +106,8 @@ export function HomePage() {
         />
         <main className="flex-1 relative overflow-hidden bg-slate-950">
           {activeWorkspace ? (
-            <WorkspaceView 
-              workspace={activeWorkspace} 
+            <WorkspaceView
+              workspace={activeWorkspace}
               onUpdate={handleUpdateWorkspace}
               onDelete={handleDeleteWorkspace}
             />
@@ -112,7 +115,11 @@ export function HomePage() {
             <div className="h-full flex flex-col items-center justify-center text-slate-600 gap-4">
               <Zap className="w-12 h-12 opacity-20" />
               <p className="text-lg">Select or create a space to begin</p>
-              <Button onClick={() => handleCreateWorkspace('New Space')} variant="outline" className="border-slate-800">
+              <Button 
+                onClick={() => handleCreateWorkspace('New Space')} 
+                variant="outline" 
+                className="border-slate-800 hover:bg-slate-800 text-slate-400"
+              >
                 Quick Start
               </Button>
             </div>
@@ -123,5 +130,3 @@ export function HomePage() {
     </DndContext>
   );
 }
-import { Zap } from 'lucide-react';
-import { Button } from '@/components/ui/button';
