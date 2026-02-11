@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
-import { Calendar, Tag, Trash2, Clock, AlignLeft, CheckCircle2, MoreVertical, X } from 'lucide-react';
+import { Calendar, Tag, Trash2, Clock, AlignLeft, CheckCircle2, MoreVertical, X, Plus } from 'lucide-react';
 import { format } from 'date-fns';
 const LABEL_COLORS: Record<string, string> = {
   'Design': 'bg-blue-500',
