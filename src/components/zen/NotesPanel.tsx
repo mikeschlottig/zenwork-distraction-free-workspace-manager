@@ -2,11 +2,13 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { api } from '@/lib/api-client';
 import type { Workspace, Note } from '@shared/types';
 import { toast } from 'sonner';
-import { Loader2, Plus, Trash2, Calendar } from 'lucide-react';
+import { Loader2, Plus, Trash2, Calendar, LayoutGrid, Table as TableIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { format } from 'date-fns';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 interface NoteCardProps {
   note: Note;
   workspaceId: string;
@@ -24,14 +26,14 @@ function NoteCard({ note, workspaceId, onUpdate, onDelete }: NoteCardProps) {
         method: 'PATCH',
         body: JSON.stringify({ title: t, content: c }),
       });
-      const savedNote = Array.isArray(updatedWs.notes) ? updatedWs.notes.find(n => n.id === note.id) : note;
+      const savedNote = Array.isArray(updatedWs.notes) ? updatedWs.notes.find(n => n.id === note.id) : null;
       if (savedNote) onUpdate(savedNote);
     } catch (err) {
       toast.error('Failed to auto-save note');
     } finally {
       setIsSaving(false);
     }
-  }, [note.id, workspaceId, onUpdate, note]);
+  }, [workspaceId, onUpdate, note.id]);
   useEffect(() => {
     const timer = setTimeout(() => {
       if (title !== note.title || content !== note.content) {
@@ -39,7 +41,7 @@ function NoteCard({ note, workspaceId, onUpdate, onDelete }: NoteCardProps) {
       }
     }, 800);
     return () => clearTimeout(timer);
-  }, [title, content, note, performSave]);
+  }, [title, content, performSave, note.title, note.content]);
   return (
     <Card className="bg-slate-900/40 border-slate-800 hover:border-slate-700 transition-colors shadow-lg">
       <CardHeader className="p-4 pb-2 space-y-2">
@@ -80,7 +82,18 @@ function NoteCard({ note, workspaceId, onUpdate, onDelete }: NoteCardProps) {
 }
 export function NotesPanel({ workspace, onUpdate }: { workspace: Workspace, onUpdate: (ws: Workspace) => void }) {
   const safeNotes: Note[] = React.useMemo(() => Array.isArray(workspace.notes) ? workspace.notes : [], [workspace.notes]);
-
+  const viewMode = workspace.layout.notesViewMode ?? 'cards';
+  const updateViewMode = async (mode: 'cards' | 'table') => {
+    try {
+      const updated = await api<Workspace>(`/api/workspaces/${workspace.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ layout: { ...workspace.layout, notesViewMode: mode } }),
+      });
+      onUpdate(updated);
+    } catch (err) {
+      toast.error('Failed to update view mode');
+    }
+  };
   const handleAddNote = async () => {
     const newNote: Note = {
       id: crypto.randomUUID(),
@@ -98,7 +111,6 @@ export function NotesPanel({ workspace, onUpdate }: { workspace: Workspace, onUp
       onUpdate(updatedWs);
       toast.success('Note added');
     } catch (err) {
-      onUpdate({...workspace, notes: newNotes});
       toast.error('Failed to add note');
     }
   };
@@ -111,7 +123,6 @@ export function NotesPanel({ workspace, onUpdate }: { workspace: Workspace, onUp
       });
       onUpdate(updatedWs);
     } catch (err) {
-      onUpdate({...workspace, notes: newNotes});
       toast.error('Failed to delete note');
     }
   };
@@ -119,25 +130,70 @@ export function NotesPanel({ workspace, onUpdate }: { workspace: Workspace, onUp
     const newNotes = safeNotes.map(n => n.id === updatedNote.id ? updatedNote : n);
     onUpdate({...workspace, notes: newNotes});
   };
+  const sortedNotes = [...safeNotes].sort((a,b) => b.updatedAt - a.updatedAt);
   return (
     <div className="space-y-6 max-w-6xl mx-auto">
       <div className="flex items-center justify-between">
-        <h3 className="text-xl font-bold text-white tracking-tight">Space Scratchpad</h3>
-        <Button onClick={handleAddNote} className="bg-fuchsia-600 hover:bg-fuchsia-700 text-white rounded-full">
+        <div className="flex items-center gap-4">
+          <h3 className="text-xl font-bold text-white tracking-tight">Space Scratchpad</h3>
+          <Tabs value={viewMode} onValueChange={(v) => updateViewMode(v as 'cards' | 'table')}>
+            <TabsList className="bg-slate-900 border border-slate-800 p-0.5 h-8">
+              <TabsTrigger value="cards" className="h-7 px-2 data-[state=active]:bg-slate-800"><LayoutGrid className="w-3.5 h-3.5" /></TabsTrigger>
+              <TabsTrigger value="table" className="h-7 px-2 data-[state=active]:bg-slate-800"><TableIcon className="w-3.5 h-3.5" /></TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </div>
+        <Button onClick={handleAddNote} size="sm" className="bg-fuchsia-600 hover:bg-fuchsia-700 text-white rounded-full">
           <Plus className="w-4 h-4 mr-2" />
           New Note
         </Button>
       </div>
       {safeNotes.length === 0 ? (
         <div className="text-center py-20 bg-slate-900/20 rounded-3xl border border-dashed border-slate-800">
-          <div className="text-slate-500 mb-4">Capture your thoughts for this workspace.</div>
-          <Button variant="outline" onClick={handleAddNote} className="border-slate-800">
+          <div className="text-slate-500 mb-4 text-sm">Capture your thoughts for this workspace.</div>
+          <Button variant="outline" size="sm" onClick={handleAddNote} className="border-slate-800">
             Create your first note
           </Button>
         </div>
+      ) : viewMode === 'table' ? (
+        <div className="rounded-xl border border-slate-800 bg-slate-950 overflow-hidden">
+          <Table>
+            <TableHeader className="bg-slate-900/50">
+              <TableRow className="border-slate-800 hover:bg-transparent">
+                <TableHead className="text-slate-400 font-bold">Title</TableHead>
+                <TableHead className="text-slate-400 font-bold hidden md:table-cell">Preview</TableHead>
+                <TableHead className="text-slate-400 font-bold">Last Updated</TableHead>
+                <TableHead className="text-right text-slate-400 font-bold">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {sortedNotes.map((note) => (
+                <TableRow key={note.id} className="border-slate-800 hover:bg-slate-900/40 group">
+                  <TableCell className="font-medium text-slate-200">{note.title || 'Untitled'}</TableCell>
+                  <TableCell className="text-slate-500 hidden md:table-cell max-w-xs truncate">
+                    {note.content || <span className="italic opacity-30">No content</span>}
+                  </TableCell>
+                  <TableCell className="text-slate-400 text-xs">
+                    {format(note.updatedAt, 'MMM d, h:mm a')}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      onClick={() => handleDeleteNote(note.id)}
+                      className="h-8 w-8 text-slate-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {safeNotes.slice().sort((a,b) => b.updatedAt - a.updatedAt).map(note => (
+          {sortedNotes.map(note => (
             <NoteCard
               key={note.id}
               note={note}

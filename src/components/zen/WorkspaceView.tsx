@@ -4,11 +4,12 @@ import { ResourceList } from './ResourceList';
 import { NotesPanel } from './NotesPanel';
 import { TaskBoard } from './TaskBoard';
 import type { Workspace } from '@shared/types';
-import { Search, Share2, MoreHorizontal, LayoutGrid, Trash2, Settings2 } from 'lucide-react';
+import { Search, Share2, MoreHorizontal, LayoutGrid, Trash2, Settings2, Check, RefreshCw } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
 import { api } from '@/lib/api-client';
+import { cn } from '@/lib/utils';
 interface WorkspaceViewProps {
   workspace: Workspace;
   onUpdate: (ws: Workspace) => void;
@@ -21,16 +22,34 @@ export function WorkspaceView({ workspace, onUpdate, onDelete }: WorkspaceViewPr
     navigator.clipboard.writeText(url);
     toast.success('Workspace link copied to clipboard!');
   };
-  const updateColumns = async (cols: number) => {
+  const updateLayout = async (cols: number) => {
     try {
       const updated = await api<Workspace>(`/api/workspaces/${workspace.id}`, {
         method: 'PATCH',
         body: JSON.stringify({ layout: { ...workspace.layout, columns: cols } }),
       });
       onUpdate(updated);
-      toast.success(`Layout updated to ${cols} columns`);
+      toast.success(`Grid updated to ${cols} column${cols > 1 ? 's' : ''}`);
     } catch (err) {
       toast.error('Failed to update layout');
+    }
+  };
+  const resetToDefault = async () => {
+    try {
+      const updated = await api<Workspace>(`/api/workspaces/${workspace.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ 
+          layout: { 
+            columns: 1, 
+            resourceOrder: [], 
+            notesViewMode: 'cards' 
+          } 
+        }),
+      });
+      onUpdate(updated);
+      toast.success('Workspace layout reset to default');
+    } catch (err) {
+      toast.error('Failed to reset workspace');
     }
   };
   return (
@@ -61,21 +80,27 @@ export function WorkspaceView({ workspace, onUpdate, onDelete }: WorkspaceViewPr
                 <MoreHorizontal className="w-5 h-5" />
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56 bg-slate-900 border-slate-800 text-slate-200">
-              <DropdownMenuLabel>Workspace Options</DropdownMenuLabel>
+            <DropdownMenuContent align="end" className="w-60 bg-slate-950 border-slate-800 text-slate-200 shadow-2xl">
+              <DropdownMenuLabel className="text-xs text-slate-500 uppercase tracking-widest px-3">Visual Settings</DropdownMenuLabel>
               <DropdownMenuSeparator className="bg-slate-800" />
-              <DropdownMenuItem onClick={() => updateColumns(1)} className="hover:bg-slate-800 cursor-pointer">
-                <LayoutGrid className="w-4 h-4 mr-2" /> 1 Column Layout
+              <DropdownMenuItem onClick={() => updateLayout(1)} className="hover:bg-slate-800 cursor-pointer flex justify-between">
+                <div className="flex items-center"><LayoutGrid className="w-4 h-4 mr-2" /> 1 Column</div>
+                {workspace.layout.columns === 1 && <Check className="w-4 h-4 text-blue-500" />}
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => updateColumns(2)} className="hover:bg-slate-800 cursor-pointer">
-                <LayoutGrid className="w-4 h-4 mr-2" /> 2 Column Layout
+              <DropdownMenuItem onClick={() => updateLayout(2)} className="hover:bg-slate-800 cursor-pointer flex justify-between">
+                <div className="flex items-center"><LayoutGrid className="w-4 h-4 mr-2" /> 2 Columns</div>
+                {workspace.layout.columns === 2 && <Check className="w-4 h-4 text-blue-500" />}
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => updateColumns(3)} className="hover:bg-slate-800 cursor-pointer">
-                <LayoutGrid className="w-4 h-4 mr-2" /> 3 Column Layout
+              <DropdownMenuItem onClick={() => updateLayout(3)} className="hover:bg-slate-800 cursor-pointer flex justify-between">
+                <div className="flex items-center"><LayoutGrid className="w-4 h-4 mr-2" /> 3 Columns</div>
+                {workspace.layout.columns === 3 && <Check className="w-4 h-4 text-blue-500" />}
               </DropdownMenuItem>
               <DropdownMenuSeparator className="bg-slate-800" />
+              <DropdownMenuItem onClick={resetToDefault} className="hover:bg-slate-800 cursor-pointer text-slate-400">
+                <RefreshCw className="w-4 h-4 mr-2" /> Reset View to Default
+              </DropdownMenuItem>
               <DropdownMenuItem className="hover:bg-slate-800 cursor-pointer">
-                <Settings2 className="w-4 h-4 mr-2" /> Integrations
+                <Settings2 className="w-4 h-4 mr-2" /> Workspace Settings
               </DropdownMenuItem>
               <DropdownMenuSeparator className="bg-slate-800" />
               <AlertDialog>
@@ -86,14 +111,14 @@ export function WorkspaceView({ workspace, onUpdate, onDelete }: WorkspaceViewPr
                 </AlertDialogTrigger>
                 <AlertDialogContent className="bg-slate-900 border-slate-800 text-slate-200">
                   <AlertDialogHeader>
-                    <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                    <AlertDialogTitle>Delete "{workspace.name}"?</AlertDialogTitle>
                     <AlertDialogDescription className="text-slate-400">
-                      This will permanently delete the "{workspace.name}" space and all its resources, notes, and tasks.
+                      All resources, notes, and tasks will be removed permanently.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
-                    <AlertDialogCancel className="bg-slate-800 border-slate-700 hover:bg-slate-700">Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={() => onDelete(workspace.id)} className="bg-red-600 hover:bg-red-700">Delete</AlertDialogAction>
+                    <AlertDialogCancel className="bg-slate-800 border-slate-700">Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={() => onDelete(workspace.id)} className="bg-red-600 hover:bg-red-700">Delete Permanently</AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>
               </AlertDialog>
@@ -101,18 +126,18 @@ export function WorkspaceView({ workspace, onUpdate, onDelete }: WorkspaceViewPr
           </DropdownMenu>
         </div>
       </header>
-      <div className="px-8 flex-1 overflow-auto">
-        <Tabs defaultValue="resources" className="w-full h-full flex flex-col" onValueChange={setActiveTab}>
+      <div className="px-8 flex-1 overflow-auto custom-scrollbar">
+        <Tabs value={activeTab} className="w-full h-full flex flex-col" onValueChange={setActiveTab}>
           <div className="pt-4 mb-6">
-            <TabsList className="bg-slate-900/50 border border-slate-800 p-1">
-              <TabsTrigger value="resources" className="data-[state=active]:bg-slate-800 data-[state=active]:text-blue-400">Resources</TabsTrigger>
-              <TabsTrigger value="notes" className="data-[state=active]:bg-slate-800 data-[state=active]:text-fuchsia-400">Notes</TabsTrigger>
-              <TabsTrigger value="tasks" className="data-[state=active]:bg-slate-800 data-[state=active]:text-emerald-400">Tasks</TabsTrigger>
+            <TabsList className="bg-slate-900 border border-slate-800 p-1 rounded-xl">
+              <TabsTrigger value="resources" className="rounded-lg data-[state=active]:bg-slate-800 data-[state=active]:text-blue-400 transition-all px-6">Resources</TabsTrigger>
+              <TabsTrigger value="notes" className="rounded-lg data-[state=active]:bg-slate-800 data-[state=active]:text-fuchsia-400 transition-all px-6">Notes</TabsTrigger>
+              <TabsTrigger value="tasks" className="rounded-lg data-[state=active]:bg-slate-800 data-[state=active]:text-emerald-400 transition-all px-6">Tasks</TabsTrigger>
             </TabsList>
           </div>
           <div className="flex-1 pb-10">
             <TabsContent value="resources" className="m-0 focus-visible:ring-0">
-              <ResourceList workspaceId={workspace.id} />
+              <ResourceList workspaceId={workspace.id} layout={workspace.layout} />
             </TabsContent>
             <TabsContent value="notes" className="m-0 focus-visible:ring-0">
               <NotesPanel workspace={workspace} onUpdate={onUpdate} />

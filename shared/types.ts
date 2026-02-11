@@ -19,6 +19,7 @@ export interface Task {
 export interface WorkspaceLayout {
   columns: number;
   resourceOrder: string[]; // IDs in order
+  notesViewMode?: 'cards' | 'table';
 }
 export interface Workspace {
   id: string;

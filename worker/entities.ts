@@ -9,7 +9,11 @@ export class WorkspaceEntity extends IndexedEntity<Workspace> {
     name: "New Space",
     notes: [],
     tasks: [],
-    layout: { columns: 1, resourceOrder: [] },
+    layout: { 
+      columns: 1, 
+      resourceOrder: [],
+      notesViewMode: "cards"
+    },
     createdAt: 0
   };
   static seedData = MOCK_WORKSPACES;
@@ -27,6 +31,16 @@ export class WorkspaceEntity extends IndexedEntity<Workspace> {
       ...s,
       notes: s.notes.filter(n => n.id !== noteId)
     }));
+  }
+  // Override patch to ensure layout objects are merged rather than overwritten
+  override async patch(p: Partial<Workspace>): Promise<void> {
+    await this.mutate((s) => {
+      const next = { ...s, ...p };
+      if (p.layout && s.layout) {
+        next.layout = { ...s.layout, ...p.layout };
+      }
+      return next;
+    });
   }
 }
 export class ResourceEntity extends IndexedEntity<Resource> {
