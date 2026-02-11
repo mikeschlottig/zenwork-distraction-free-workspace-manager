@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ResourceList } from './ResourceList';
 import { NotesPanel } from './NotesPanel';
@@ -16,6 +16,11 @@ interface WorkspaceViewProps {
   onDelete: (id: string) => void;
 }
 export function WorkspaceView({ workspace, onUpdate, onDelete }: WorkspaceViewProps) {
+  const safeLayout = React.useMemo(() => ({
+    columns: workspace.layout?.columns ?? 1,
+    resourceOrder: workspace.layout?.resourceOrder ?? [],
+    notesViewMode: workspace.layout?.notesViewMode ?? 'cards'
+  }), [workspace.layout]);
   const [activeTab, setActiveTab] = useState('resources');
   const handleShare = () => {
     const url = window.location.href;
@@ -26,7 +31,7 @@ export function WorkspaceView({ workspace, onUpdate, onDelete }: WorkspaceViewPr
     try {
       const updated = await api<Workspace>(`/api/workspaces/${workspace.id}`, {
         method: 'PATCH',
-        body: JSON.stringify({ layout: { ...workspace.layout, columns: cols } }),
+        body: JSON.stringify({ layout: { ...safeLayout, columns: cols } }),
       });
       onUpdate(updated);
       toast.success(`Grid updated to ${cols} column${cols > 1 ? 's' : ''}`);
@@ -85,15 +90,15 @@ export function WorkspaceView({ workspace, onUpdate, onDelete }: WorkspaceViewPr
               <DropdownMenuSeparator className="bg-slate-800" />
               <DropdownMenuItem onClick={() => updateLayout(1)} className="hover:bg-slate-800 cursor-pointer flex justify-between">
                 <div className="flex items-center"><LayoutGrid className="w-4 h-4 mr-2" /> 1 Column</div>
-                {workspace.layout.columns === 1 && <Check className="w-4 h-4 text-blue-500" />}
+                {safeLayout.columns === 1 && <Check className="w-4 h-4 text-blue-500" />}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => updateLayout(2)} className="hover:bg-slate-800 cursor-pointer flex justify-between">
                 <div className="flex items-center"><LayoutGrid className="w-4 h-4 mr-2" /> 2 Columns</div>
-                {workspace.layout.columns === 2 && <Check className="w-4 h-4 text-blue-500" />}
+                {safeLayout.columns === 2 && <Check className="w-4 h-4 text-blue-500" />}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => updateLayout(3)} className="hover:bg-slate-800 cursor-pointer flex justify-between">
                 <div className="flex items-center"><LayoutGrid className="w-4 h-4 mr-2" /> 3 Columns</div>
-                {workspace.layout.columns === 3 && <Check className="w-4 h-4 text-blue-500" />}
+                {safeLayout.columns === 3 && <Check className="w-4 h-4 text-blue-500" />}
               </DropdownMenuItem>
               <DropdownMenuSeparator className="bg-slate-800" />
               <DropdownMenuItem onClick={resetToDefault} className="hover:bg-slate-800 cursor-pointer text-slate-400">
@@ -137,7 +142,7 @@ export function WorkspaceView({ workspace, onUpdate, onDelete }: WorkspaceViewPr
           </div>
           <div className="flex-1 pb-10">
             <TabsContent value="resources" className="m-0 focus-visible:ring-0">
-              <ResourceList workspaceId={workspace.id} layout={workspace.layout} />
+              <ResourceList workspaceId={workspace.id} layout={safeLayout} />
             </TabsContent>
             <TabsContent value="notes" className="m-0 focus-visible:ring-0">
               <NotesPanel workspace={workspace} onUpdate={onUpdate} />

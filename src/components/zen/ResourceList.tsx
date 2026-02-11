@@ -76,6 +76,7 @@ function SortableResource({ resource, onDelete, columns }: SortableItemProps) {
   );
 }
 export function ResourceList({ workspaceId, layout }: { workspaceId: string, layout: WorkspaceLayout }) {
+  const safeColumns = layout?.columns ?? 1;
   const [resources, setResources] = useState<Resource[]>([]);
   const [newUrl, setNewUrl] = useState('');
   const [isAdding, setIsAdding] = useState(false);
@@ -122,13 +123,13 @@ export function ResourceList({ workspaceId, layout }: { workspaceId: string, lay
       toast.error('Failed to add resource');
     }
   };
-  const gridCols = layout.columns === 1 ? "grid-cols-1" : layout.columns === 2 ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1 md:grid-cols-2 lg:grid-cols-3";
+  const gridCols = safeColumns === 1 ? "grid-cols-1" : safeColumns === 2 ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1 md:grid-cols-2 lg:grid-cols-3";
   return (
     <div className="space-y-4 max-w-6xl mx-auto min-h-[300px]">
       <div className="flex justify-between items-center mb-6">
         <div>
           <h3 className="text-lg font-semibold text-slate-100">Resources</h3>
-          <p className="text-xs text-slate-500">Sorted links in {layout.columns} column(s)</p>
+          <p className="text-xs text-slate-500">Sorted links in {safeColumns} column(s)</p>
         </div>
         <Button onClick={() => setIsAdding(true)} variant="outline" size="sm" className="bg-blue-500/10 border-blue-500/30 text-blue-400">
           <Plus className="w-4 h-4 mr-2" />
@@ -148,13 +149,13 @@ export function ResourceList({ workspaceId, layout }: { workspaceId: string, lay
         <SortableContext items={resources.map(r => r.id)} strategy={rectSortingStrategy}>
           <div className={cn("grid gap-3", gridCols)}>
             {resources.map((res) => (
-              <SortableResource 
-                key={res.id} 
-                resource={res} 
-                columns={layout.columns}
+              <SortableResource
+                key={res.id}
+                resource={res}
+                columns={safeColumns}
                 onDelete={(id) => {
                   api(`/api/resources/${id}`, { method: 'DELETE' }).then(() => setResources(prev => prev.filter(r => r.id !== id)));
-                }} 
+                }}
               />
             ))}
             {resources.length === 0 && !isAdding && (

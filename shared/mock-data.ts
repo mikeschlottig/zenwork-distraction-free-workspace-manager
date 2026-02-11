@@ -16,7 +16,7 @@ export const MOCK_WORKSPACES: Workspace[] = [
       { id: 't1', text: 'Refactor sidebar logic', completed: true, createdAt: Date.now() },
       { id: 't2', text: 'Add drag and drop to resources', completed: false, createdAt: Date.now() },
     ],
-    layout: { columns: 1, resourceOrder: ['r1', 'r2'] },
+    layout: { columns: 1, resourceOrder: ['r1', 'r2'], notesViewMode: 'cards' },
     createdAt: Date.now(),
   },
   {
@@ -32,7 +32,7 @@ export const MOCK_WORKSPACES: Workspace[] = [
       }
     ],
     tasks: [],
-    layout: { columns: 1, resourceOrder: ['r3'] },
+    layout: { columns: 1, resourceOrder: ['r3'], notesViewMode: 'cards' },
     createdAt: Date.now(),
   }
 ];

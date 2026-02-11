@@ -19,6 +19,12 @@ function NoteCard({ note, workspaceId, onUpdate, onDelete }: NoteCardProps) {
   const [title, setTitle] = useState(note.title);
   const [content, setContent] = useState(note.content);
   const [isSaving, setIsSaving] = useState(false);
+
+  // Sync local state when note prop changes (e.g. after server save)
+  useEffect(() => {
+    if (title !== note.title) setTitle(note.title);
+    if (content !== note.content) setContent(note.content);
+  }, [note.title, note.content, title, content]);
   const performSave = useCallback(async (t: string, c: string) => {
     setIsSaving(true);
     try {
@@ -34,6 +40,7 @@ function NoteCard({ note, workspaceId, onUpdate, onDelete }: NoteCardProps) {
       setIsSaving(false);
     }
   }, [workspaceId, onUpdate, note.id]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     const timer = setTimeout(() => {
       if (title !== note.title || content !== note.content) {
@@ -41,7 +48,7 @@ function NoteCard({ note, workspaceId, onUpdate, onDelete }: NoteCardProps) {
       }
     }, 800);
     return () => clearTimeout(timer);
-  }, [title, content, performSave, note.title, note.content]);
+  }, [title, content, performSave]);
   return (
     <Card className="bg-slate-900/40 border-slate-800 hover:border-slate-700 transition-colors shadow-lg">
       <CardHeader className="p-4 pb-2 space-y-2">
@@ -82,12 +89,13 @@ function NoteCard({ note, workspaceId, onUpdate, onDelete }: NoteCardProps) {
 }
 export function NotesPanel({ workspace, onUpdate }: { workspace: Workspace, onUpdate: (ws: Workspace) => void }) {
   const safeNotes: Note[] = React.useMemo(() => Array.isArray(workspace.notes) ? workspace.notes : [], [workspace.notes]);
-  const viewMode = workspace.layout.notesViewMode ?? 'cards';
+  const safeLayout = workspace.layout ?? { columns: 1, resourceOrder: [], notesViewMode: 'cards' };
+  const viewMode = safeLayout.notesViewMode;
   const updateViewMode = async (mode: 'cards' | 'table') => {
     try {
       const updated = await api<Workspace>(`/api/workspaces/${workspace.id}`, {
         method: 'PATCH',
-        body: JSON.stringify({ layout: { ...workspace.layout, notesViewMode: mode } }),
+        body: JSON.stringify({ layout: { ...safeLayout, notesViewMode: mode } }),
       });
       onUpdate(updated);
     } catch (err) {
@@ -128,7 +136,7 @@ export function NotesPanel({ workspace, onUpdate }: { workspace: Workspace, onUp
   };
   const handleNoteUpdate = (updatedNote: Note) => {
     const newNotes = safeNotes.map(n => n.id === updatedNote.id ? updatedNote : n);
-    onUpdate({...workspace, notes: newNotes});
+    onUpdate({ ...workspace, notes: newNotes });
   };
   const sortedNotes = [...safeNotes].sort((a,b) => b.updatedAt - a.updatedAt);
   return (
