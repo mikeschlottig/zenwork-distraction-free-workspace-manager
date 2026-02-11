@@ -3,6 +3,31 @@ export interface ApiResponse<T = unknown> {
   data?: T;
   error?: string;
 }
+export interface Note {
+  id: string;
+  title: string;
+  content: string;
+  createdAt: number;
+  updatedAt: number;
+}
+export interface Task {
+  id: string;
+  text: string;
+  completed: boolean;
+  createdAt: number;
+}
+export interface WorkspaceLayout {
+  columns: number;
+  resourceOrder: string[]; // IDs in order
+}
+export interface Workspace {
+  id: string;
+  name: string;
+  notes: Note[];
+  tasks: Task[];
+  layout: WorkspaceLayout;
+  createdAt: number;
+}
 export interface Resource {
   id: string;
   workspaceId: string;
@@ -11,20 +36,6 @@ export interface Resource {
   favicon?: string;
   order: number;
 }
-export interface Task {
-  id: string;
-  text: string;
-  completed: boolean;
-  createdAt: number;
-}
-export interface Workspace {
-  id: string;
-  name: string;
-  notes: string;
-  tasks: Task[];
-  createdAt: number;
-}
-// User types kept for compatibility if needed
 export interface User {
   id: string;
   name: string;

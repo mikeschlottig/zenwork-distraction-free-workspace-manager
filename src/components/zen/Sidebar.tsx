@@ -1,9 +1,56 @@
 import React, { useState } from 'react';
-import { Plus, Layout, Trash2, Zap } from 'lucide-react';
+import { Plus, Layout, Trash2, Zap, FolderInput } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { useDroppable } from '@dnd-kit/core';
 import type { Workspace } from '@shared/types';
+import { api } from '@/lib/api-client';
+import { toast } from 'sonner';
+interface SidebarItemProps {
+  ws: Workspace;
+  isActive: boolean;
+  onSelect: (id: string) => void;
+  onDelete: (id: string) => void;
+}
+function SidebarItem({ ws, isActive, onSelect, onDelete }: SidebarItemProps) {
+  const { isOver, setNodeRef } = useDroppable({
+    id: `sidebar-${ws.id}`,
+    data: { workspaceId: ws.id }
+  });
+  return (
+    <div
+      ref={setNodeRef}
+      className={cn(
+        "group flex items-center justify-between px-3 py-2 rounded-md transition-all cursor-pointer relative",
+        isActive
+          ? "bg-blue-600/10 text-blue-400 border border-blue-500/20"
+          : "text-slate-400 hover:bg-slate-800 hover:text-slate-200",
+        isOver && "ring-2 ring-blue-500 bg-blue-500/20"
+      )}
+      onClick={() => onSelect(ws.id)}
+    >
+      <div className="flex items-center gap-2 truncate relative z-10">
+        <Layout className="w-4 h-4" />
+        <span className="truncate font-medium">{ws.name}</span>
+      </div>
+      {isOver && (
+        <div className="absolute right-2 flex items-center gap-1 animate-pulse text-blue-400">
+          <FolderInput className="w-3.5 h-3.5" />
+          <span className="text-[10px] font-bold">MOVE</span>
+        </div>
+      )}
+      {!isOver && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onDelete(ws.id); }}
+          className="opacity-0 group-hover:opacity-100 p-1 hover:text-red-400 transition-opacity z-10"
+        >
+          <Trash2 className="w-3.5 h-3.5" />
+        </button>
+      )}
+    </div>
+  );
+}
 interface SidebarProps {
   workspaces: Workspace[];
   activeId: string | null;
@@ -23,7 +70,7 @@ export function Sidebar({ workspaces, activeId, onSelect, onCreate, onDelete }: 
     }
   };
   return (
-    <aside className="w-64 bg-slate-900 border-r border-slate-800 flex flex-col h-full">
+    <aside className="w-64 bg-slate-900 border-r border-slate-800 flex flex-col h-full shrink-0">
       <div className="p-6 flex items-center gap-3">
         <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-fuchsia-500 flex items-center justify-center">
           <Zap className="w-5 h-5 text-white" />
@@ -35,33 +82,19 @@ export function Sidebar({ workspaces, activeId, onSelect, onCreate, onDelete }: 
           Your Spaces
         </div>
         {workspaces.map((ws) => (
-          <div
-            key={ws.id}
-            className={cn(
-              "group flex items-center justify-between px-3 py-2 rounded-md transition-all cursor-pointer",
-              activeId === ws.id 
-                ? "bg-blue-600/10 text-blue-400 border border-blue-500/20" 
-                : "text-slate-400 hover:bg-slate-800 hover:text-slate-200"
-            )}
-            onClick={() => onSelect(ws.id)}
-          >
-            <div className="flex items-center gap-2 truncate">
-              <Layout className="w-4 h-4" />
-              <span className="truncate font-medium">{ws.name}</span>
-            </div>
-            <button 
-              onClick={(e) => { e.stopPropagation(); onDelete(ws.id); }}
-              className="opacity-0 group-hover:opacity-100 p-1 hover:text-red-400 transition-opacity"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-            </button>
-          </div>
+          <SidebarItem 
+            key={ws.id} 
+            ws={ws} 
+            isActive={activeId === ws.id} 
+            onSelect={onSelect} 
+            onDelete={onDelete} 
+          />
         ))}
         {isCreating ? (
           <form onSubmit={handleSubmit} className="px-3 py-2 animate-in fade-in slide-in-from-top-1">
             <Input
               autoFocus
-              className="h-8 bg-slate-800 border-slate-700 text-sm"
+              className="h-8 bg-slate-800 border-slate-700 text-sm focus:ring-blue-500/50"
               placeholder="Space name..."
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
@@ -81,7 +114,7 @@ export function Sidebar({ workspaces, activeId, onSelect, onCreate, onDelete }: 
       </div>
       <div className="p-4 border-t border-slate-800">
         <div className="text-[10px] text-slate-600 text-center uppercase tracking-widest font-bold">
-          Focus is Power
+          Phase 2 Active
         </div>
       </div>
     </aside>

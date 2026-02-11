@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import type { Env } from './core-utils';
 import { WorkspaceEntity, ResourceEntity } from "./entities";
-import { ok, bad, notFound, isStr } from './core-utils';
+import { ok, bad, notFound } from './core-utils';
 export function userRoutes(app: Hono<{ Bindings: Env }>) {
   // WORKSPACES
   app.get('/api/workspaces', async (c) => {
@@ -14,8 +14,9 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
     const workspace = await WorkspaceEntity.create(c.env, {
       ...data,
       id: crypto.randomUUID(),
-      notes: '',
+      notes: [],
       tasks: [],
+      layout: { columns: 1, resourceOrder: [] },
       createdAt: Date.now()
     });
     return ok(c, workspace);
@@ -25,6 +26,7 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
     const data = await c.req.json();
     const ws = new WorkspaceEntity(c.env, id);
     if (!await ws.exists()) return notFound(c);
+    // Deep merge protection for sensitive arrays if needed, but entity.patch handles root level
     await ws.patch(data);
     return ok(c, await ws.getState());
   });
@@ -45,9 +47,17 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
     const resource = await ResourceEntity.create(c.env, {
       ...data,
       id: crypto.randomUUID(),
-      order: Date.now() // Simple ordering
+      order: data.order ?? Date.now()
     });
     return ok(c, resource);
+  });
+  app.patch('/api/resources/:id', async (c) => {
+    const id = c.req.param('id');
+    const data = await c.req.json();
+    const res = new ResourceEntity(c.env, id);
+    if (!await res.exists()) return notFound(c);
+    await res.patch(data);
+    return ok(c, await res.getState());
   });
   app.delete('/api/resources/:id', async (c) => {
     await ResourceEntity.delete(c.env, c.req.param('id'));
