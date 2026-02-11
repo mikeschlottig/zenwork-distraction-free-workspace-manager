@@ -4,7 +4,7 @@
  */
  {
 	"$schema": "node_modules/wrangler/config-schema.json",
-	"name": "vite-cf-do-runner",
+	"name": "zenwork-f2bxuzyrmju42hee_4ej2",
 	"main": "worker/index.ts",
 	"compatibility_date": "2025-04-24",
 	"assets": {
