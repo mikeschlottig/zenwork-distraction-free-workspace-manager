@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Zap, Loader2 } from 'lucide-react';
+import { DndContext, DragEndEvent, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import { toast } from 'sonner';
 import { Sidebar } from '@/components/zen/Sidebar';
 import { WorkspaceView } from '@/components/zen/WorkspaceView';
 import { Toaster } from '@/components/ui/sonner';
 import { Button } from '@/components/ui/button';
 import { api } from '@/lib/api-client';
 import type { Workspace } from '@shared/types';
-import { DndContext, DragEndEvent, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
-import { toast } from 'sonner';
 export function HomePage() {
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -65,7 +65,6 @@ export function HomePage() {
   const handleDragEndGlobal = async (event: DragEndEvent) => {
     const { active, over } = event;
     if (!over) return;
-    // Handle cross-workspace resource drop (dragged from list to sidebar item)
     if (String(over.id).startsWith('sidebar-') && !String(active.id).startsWith('sidebar-')) {
       const targetWsId = over.data.current?.workspaceId;
       const resourceId = active.id;
@@ -73,14 +72,18 @@ export function HomePage() {
         try {
           await api(`/api/resources/${resourceId}`, {
             method: 'PATCH',
-            body: JSON.stringify({ workspaceId: targetWsId })
+            body: JSON.stringify({ workspaceId: targetWsId, groupId: undefined })
           });
           toast.success('Moved resource to new space');
-          // Refresh active workspace to update local resource list
-          if (activeId) {
-             const reloadWs = await api<Workspace>(`/api/workspaces/${activeId}`);
-             handleUpdateWorkspace(reloadWs);
-          }
+          const [updatedActive, updatedTarget] = await Promise.all([
+            api<Workspace>(`/api/workspaces/${activeId}`),
+            api<Workspace>(`/api/workspaces/${targetWsId}`)
+          ]);
+          setWorkspaces(prev => prev.map(w => {
+            if (w.id === updatedActive.id) return updatedActive;
+            if (w.id === updatedTarget.id) return updatedTarget;
+            return w;
+          }));
         } catch (err) {
           toast.error('Failed to move resource');
         }
@@ -97,31 +100,15 @@ export function HomePage() {
   return (
     <DndContext sensors={sensors} onDragEnd={handleDragEndGlobal}>
       <div className="flex h-screen bg-slate-950 text-slate-200 overflow-hidden font-sans">
-        <Sidebar
-          workspaces={workspaces}
-          activeId={activeId}
-          onSelect={setActiveId}
-          onCreate={handleCreateWorkspace}
-          onDelete={handleDeleteWorkspace}
-        />
+        <Sidebar workspaces={workspaces} activeId={activeId} onSelect={setActiveId} onCreate={handleCreateWorkspace} onDelete={handleDeleteWorkspace} />
         <main className="flex-1 relative overflow-hidden bg-slate-950">
           {activeWorkspace ? (
-            <WorkspaceView
-              workspace={activeWorkspace}
-              onUpdate={handleUpdateWorkspace}
-              onDelete={handleDeleteWorkspace}
-            />
+            <WorkspaceView workspace={activeWorkspace} onUpdate={handleUpdateWorkspace} onDelete={handleDeleteWorkspace} />
           ) : (
             <div className="h-full flex flex-col items-center justify-center text-slate-600 gap-4">
               <Zap className="w-12 h-12 opacity-20" />
               <p className="text-lg">Select or create a space to begin</p>
-              <Button 
-                onClick={() => handleCreateWorkspace('New Space')} 
-                variant="outline" 
-                className="border-slate-800 hover:bg-slate-800 text-slate-400"
-              >
-                Quick Start
-              </Button>
+              <Button onClick={() => handleCreateWorkspace('New Space')} variant="outline" className="border-slate-800 hover:bg-slate-800 text-slate-400">Quick Start</Button>
             </div>
           )}
         </main>

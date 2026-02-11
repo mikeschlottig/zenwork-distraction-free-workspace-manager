@@ -16,6 +16,11 @@ export interface Task {
   completed: boolean;
   createdAt: number;
 }
+export interface ResourceGroup {
+  id: string;
+  name: string;
+  order: number;
+}
 export interface WorkspaceLayout {
   columns: number;
   resourceOrder: string[]; // IDs in order
@@ -26,16 +31,21 @@ export interface Workspace {
   name: string;
   notes: Note[];
   tasks: Task[];
+  groups: ResourceGroup[];
   layout: WorkspaceLayout;
   createdAt: number;
 }
 export interface Resource {
   id: string;
   workspaceId: string;
+  groupId?: string;
   title: string;
   url: string;
   favicon?: string;
   order: number;
+  metadata?: {
+    domain?: string;
+  };
 }
 export interface User {
   id: string;

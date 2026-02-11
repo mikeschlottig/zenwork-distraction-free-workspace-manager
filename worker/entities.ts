@@ -9,8 +9,9 @@ export class WorkspaceEntity extends IndexedEntity<Workspace> {
     name: "New Space",
     notes: [],
     tasks: [],
-    layout: { 
-      columns: 1, 
+    groups: [],
+    layout: {
+      columns: 1,
       resourceOrder: [],
       notesViewMode: "cards"
     },
@@ -26,13 +27,6 @@ export class WorkspaceEntity extends IndexedEntity<Workspace> {
       notes: s.notes.map(n => n.id === noteId ? { ...n, ...updates, updatedAt: Date.now() } : n)
     }));
   }
-  async deleteNote(noteId: string): Promise<Workspace> {
-    return this.mutate(s => ({
-      ...s,
-      notes: s.notes.filter(n => n.id !== noteId)
-    }));
-  }
-  // Override patch to ensure layout objects are merged rather than overwritten
   override async patch(p: Partial<Workspace>): Promise<void> {
     await this.mutate((s) => {
       const next = { ...s, ...p };
@@ -54,19 +48,24 @@ export class ResourceEntity extends IndexedEntity<Resource> {
     order: 0
   };
   static seedData = MOCK_RESOURCES;
+  static extractDomain(url: string): string {
+    try {
+      const u = new URL(url);
+      return u.hostname.replace('www.', '');
+    } catch {
+      return 'other';
+    }
+  }
   static async listByWorkspace(env: any, workspaceId: string): Promise<Resource[]> {
-    const { items } = await this.list(env, null, 100);
+    const { items } = await this.list(env, null, 500);
     return items
       .filter(r => r.workspaceId === workspaceId)
       .sort((a, b) => a.order - b.order);
   }
-  async move(newWorkspaceId: string): Promise<Resource> {
-    return this.mutate(s => ({ ...s, workspaceId: newWorkspaceId }));
-  }
-  static async bulkReorder(env: any, updates: { id: string, order: number }[]): Promise<void> {
+  static async bulkUpdate(env: any, updates: { id: string; patch: Partial<Resource> }[]): Promise<void> {
     await Promise.all(updates.map(async (u) => {
       const res = new ResourceEntity(env, u.id);
-      await res.patch({ order: u.order });
+      await res.patch(u.patch);
     }));
   }
 }

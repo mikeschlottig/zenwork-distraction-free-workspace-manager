@@ -19,11 +19,9 @@ function NoteCard({ note, workspaceId, onUpdate, onDelete }: NoteCardProps) {
   const [title, setTitle] = useState(note.title);
   const [content, setContent] = useState(note.content);
   const [isSaving, setIsSaving] = useState(false);
-
-  // Sync local state when note prop changes (e.g. after server save)
   useEffect(() => {
-    if (title !== note.title) setTitle(note.title);
-    if (content !== note.content) setContent(note.content);
+    setTitle(note.title);
+    setContent(note.content);
   }, [note.title, note.content]);
   const performSave = useCallback(async (t: string, c: string) => {
     setIsSaving(true);
@@ -60,12 +58,7 @@ function NoteCard({ note, workspaceId, onUpdate, onDelete }: NoteCardProps) {
           />
           <div className="flex items-center gap-2">
             {isSaving && <Loader2 className="w-3 h-3 animate-spin text-blue-500" />}
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 text-slate-500 hover:text-red-400"
-              onClick={() => onDelete(note.id)}
-            >
+            <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:text-red-400" onClick={() => onDelete(note.id)}>
               <Trash2 className="w-4 h-4" />
             </Button>
           </div>
@@ -97,41 +90,23 @@ export function NotesPanel({ workspace, onUpdate }: { workspace: Workspace, onUp
         body: JSON.stringify({ layout: { ...safeLayout, notesViewMode: mode } }),
       });
       onUpdate(updated);
-    } catch (err) {
-      toast.error('Failed to update view mode');
-    }
+    } catch { toast.error('Failed to update view mode'); }
   };
   const handleAddNote = async () => {
-    const newNote: Note = {
-      id: crypto.randomUUID(),
-      title: 'Untitled Note',
-      content: '',
-      createdAt: Date.now(),
-      updatedAt: Date.now()
-    };
+    const newNote: Note = { id: crypto.randomUUID(), title: 'Untitled Note', content: '', createdAt: Date.now(), updatedAt: Date.now() };
     const newNotes = [...safeNotes, newNote];
     try {
-      const updatedWs = await api<Workspace>(`/api/workspaces/${workspace.id}`, {
-        method: 'PATCH',
-        body: JSON.stringify({ notes: newNotes }),
-      });
+      const updatedWs = await api<Workspace>(`/api/workspaces/${workspace.id}`, { method: 'PATCH', body: JSON.stringify({ notes: newNotes }) });
       onUpdate(updatedWs);
       toast.success('Note added');
-    } catch (err) {
-      toast.error('Failed to add note');
-    }
+    } catch { toast.error('Failed to add note'); }
   };
   const handleDeleteNote = async (id: string) => {
     const newNotes = safeNotes.filter(n => n.id !== id);
     try {
-      const updatedWs = await api<Workspace>(`/api/workspaces/${workspace.id}`, {
-        method: 'PATCH',
-        body: JSON.stringify({ notes: newNotes }),
-      });
+      const updatedWs = await api<Workspace>(`/api/workspaces/${workspace.id}`, { method: 'PATCH', body: JSON.stringify({ notes: newNotes }) });
       onUpdate(updatedWs);
-    } catch (err) {
-      toast.error('Failed to delete note');
-    }
+    } catch { toast.error('Failed to delete note'); }
   };
   const handleNoteUpdate = (updatedNote: Note) => {
     const newNotes = safeNotes.map(n => n.id === updatedNote.id ? updatedNote : n);
@@ -151,47 +126,26 @@ export function NotesPanel({ workspace, onUpdate }: { workspace: Workspace, onUp
           </Tabs>
         </div>
         <Button onClick={handleAddNote} size="sm" className="bg-fuchsia-600 hover:bg-fuchsia-700 text-white rounded-full">
-          <Plus className="w-4 h-4 mr-2" />
-          New Note
+          <Plus className="w-4 h-4 mr-2" /> New Note
         </Button>
       </div>
       {safeNotes.length === 0 ? (
         <div className="text-center py-20 bg-slate-900/20 rounded-3xl border border-dashed border-slate-800">
           <div className="text-slate-500 mb-4 text-sm">Capture your thoughts for this workspace.</div>
-          <Button variant="outline" size="sm" onClick={handleAddNote} className="border-slate-800">
-            Create your first note
-          </Button>
+          <Button variant="outline" size="sm" onClick={handleAddNote} className="border-slate-800">Create your first note</Button>
         </div>
       ) : viewMode === 'table' ? (
         <div className="rounded-xl border border-slate-800 bg-slate-950 overflow-hidden">
           <Table>
-            <TableHeader className="bg-slate-900/50">
-              <TableRow className="border-slate-800 hover:bg-transparent">
-                <TableHead className="text-slate-400 font-bold">Title</TableHead>
-                <TableHead className="text-slate-400 font-bold hidden md:table-cell">Preview</TableHead>
-                <TableHead className="text-slate-400 font-bold">Last Updated</TableHead>
-                <TableHead className="text-right text-slate-400 font-bold">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
+            <TableHeader className="bg-slate-900/50"><TableRow className="border-slate-800"><TableHead>Title</TableHead><TableHead className="hidden md:table-cell">Preview</TableHead><TableHead>Last Updated</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
             <TableBody>
               {sortedNotes.map((note) => (
                 <TableRow key={note.id} className="border-slate-800 hover:bg-slate-900/40 group">
                   <TableCell className="font-medium text-slate-200">{note.title || 'Untitled'}</TableCell>
-                  <TableCell className="text-slate-500 hidden md:table-cell max-w-xs truncate">
-                    {note.content || <span className="italic opacity-30">No content</span>}
-                  </TableCell>
-                  <TableCell className="text-slate-400 text-xs">
-                    {format(note.updatedAt, 'MMM d, h:mm a')}
-                  </TableCell>
+                  <TableCell className="text-slate-500 hidden md:table-cell max-w-xs truncate">{note.content || '...'}</TableCell>
+                  <TableCell className="text-slate-400 text-xs">{format(note.updatedAt, 'MMM d, h:mm a')}</TableCell>
                   <TableCell className="text-right">
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      onClick={() => handleDeleteNote(note.id)}
-                      className="h-8 w-8 text-slate-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
+                    <Button variant="ghost" size="icon" onClick={() => handleDeleteNote(note.id)} className="h-8 w-8 text-slate-600 hover:text-red-400 opacity-0 group-hover:opacity-100"><Trash2 className="w-4 h-4" /></Button>
                   </TableCell>
                 </TableRow>
               ))}
@@ -200,15 +154,7 @@ export function NotesPanel({ workspace, onUpdate }: { workspace: Workspace, onUp
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {sortedNotes.map(note => (
-            <NoteCard
-              key={note.id}
-              note={note}
-              workspaceId={workspace.id}
-              onUpdate={handleNoteUpdate}
-              onDelete={handleDeleteNote}
-            />
-          ))}
+          {sortedNotes.map(note => <NoteCard key={note.id} note={note} workspaceId={workspace.id} onUpdate={handleNoteUpdate} onDelete={handleDeleteNote} />)}
         </div>
       )}
     </div>
