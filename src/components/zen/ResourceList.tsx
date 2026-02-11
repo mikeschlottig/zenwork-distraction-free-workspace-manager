@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { api } from '@/lib/api-client';
 import type { Resource, WorkspaceLayout, Workspace } from '@shared/types';
-import { ExternalLink, Trash2, Plus, Globe, GripVertical, Sparkles, ChevronDown, ChevronRight, Wand2, Loader2 } from 'lucide-react';
+import { ExternalLink, Trash2, Plus, Globe, GripVertical, Sparkles, ChevronDown, ChevronRight, Wand2, Loader2, ArrowRightLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
@@ -12,12 +12,22 @@ import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 interface SortableItemProps {
   resource: Resource;
-  onDelete: (id: string) => void;
+  onDelete: (id: string) => Promise<void>;
   columns: number;
 }
 function SortableResource({ resource, onDelete, columns }: SortableItemProps) {
+  const [isDeleting, setIsDeleting] = useState(false);
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: resource.id });
   const style = { transform: CSS.Transform.toString(transform), transition, zIndex: isDragging ? 50 : 'auto' };
+  const handleDeleteClick = async () => {
+    if (isDeleting) return;
+    setIsDeleting(true);
+    try {
+      await onDelete(resource.id);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
   return (
     <div ref={setNodeRef} style={style} className={cn("group flex flex-col p-3 bg-slate-900/50 border border-slate-800/50 rounded-xl hover:border-blue-500/30 hover:bg-slate-900 transition-all shadow-sm", isDragging && "opacity-50 scale-95 shadow-2xl border-blue-500/50", columns === 1 ? "flex-row items-center" : "items-start gap-3")}>
       <div className={cn("flex items-center gap-3 flex-1 truncate w-full", columns === 1 ? "" : "flex-col items-start")}>
@@ -34,13 +44,19 @@ function SortableResource({ resource, onDelete, columns }: SortableItemProps) {
         </div>
       </div>
       <div className={cn("flex items-center gap-1", columns === 1 ? "" : "w-full justify-end border-t border-slate-800/50 pt-2")}>
-        <a href={resource.url} target="_blank" rel="noopener noreferrer" className="p-1.5 text-slate-500 hover:text-blue-400 hover:bg-blue-400/10 rounded-lg transition-all"><ExternalLink className="w-3.5 h-3.5" /></a>
-        <button onClick={() => onDelete(resource.id)} className="p-1.5 text-slate-500 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-all"><Trash2 className="w-3.5 h-3.5" /></button>
+        <a href={resource.url} target="_blank" rel="noopener noreferrer" className="p-1.5 text-slate-500 hover:text-white hover:bg-slate-800 rounded-lg transition-all"><ExternalLink className="w-3.5 h-3.5" /></a>
+        <button 
+          onClick={handleDeleteClick} 
+          disabled={isDeleting}
+          className="p-1.5 text-slate-500 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-all disabled:opacity-50"
+        >
+          {isDeleting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+        </button>
       </div>
     </div>
   );
 }
-export function ResourceList({ workspaceId, layout }: { workspaceId: string, layout: WorkspaceLayout }) {
+export function ResourceList({ workspaceId, layout, onMoveRequest }: { workspaceId: string, layout: WorkspaceLayout, onMoveRequest?: (resourceId: string, targetWsId: string) => void }) {
   const [resources, setResources] = useState<Resource[]>([]);
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -49,27 +65,21 @@ export function ResourceList({ workspaceId, layout }: { workspaceId: string, lay
   const [isAdding, setIsAdding] = useState(false);
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }), useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }));
+  const loadResources = async (id: string) => {
+    try {
+      const [resData, wsData] = await Promise.all([
+        api<Resource[]>(`/api/workspaces/${id}/resources`),
+        api<Workspace>(`/api/workspaces/${id}`)
+      ]);
+      setResources(resData);
+      setWorkspace(wsData);
+    } catch (err) {
+      console.error(err);
+    }
+  };
   useEffect(() => {
-    let active = true;
-    const load = async () => {
-      setIsLoading(true);
-      try {
-        const [resData, wsData] = await Promise.all([
-          api<Resource[]>(`/api/workspaces/${workspaceId}/resources`),
-          api<Workspace>(`/api/workspaces/${workspaceId}`)
-        ]);
-        if (active) {
-          setResources(resData);
-          setWorkspace(wsData);
-        }
-      } catch (err) {
-        toast.error('Failed to load resources');
-      } finally {
-        if (active) setIsLoading(false);
-      }
-    };
-    load();
-    return () => { active = false; };
+    setIsLoading(true);
+    loadResources(workspaceId).finally(() => setIsLoading(false));
   }, [workspaceId]);
   useEffect(() => {
     if (newUrl.length > 5) {
@@ -98,6 +108,16 @@ export function ResourceList({ workspaceId, layout }: { workspaceId: string, lay
       toast.error("Failed to organize", { id: "organize" });
     }
   };
+  const handleDelete = async (id: string) => {
+    try {
+      await api(`/api/resources/${id}`, { method: 'DELETE' });
+      setResources(prev => prev.filter(r => r.id !== id));
+      toast.success('Resource deleted');
+    } catch (err) {
+      toast.error('Failed to delete resource');
+      throw err;
+    }
+  };
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
     if (over && active.id !== over.id) {
@@ -116,6 +136,15 @@ export function ResourceList({ workspaceId, layout }: { workspaceId: string, lay
     try {
       const title = newUrl.replace(/^https?:\/\/(www\.)?/, '').split('/')[0];
       const res = await api<Resource>('/api/resources', { method: 'POST', body: JSON.stringify({ workspaceId, url: newUrl, title, order: resources.length }) });
+      if (suggestion && onMoveRequest) {
+        toast('Found a better home?', {
+          description: `This resource belongs in "${suggestion.workspaceName}".`,
+          action: {
+            label: 'Move Now',
+            onClick: () => onMoveRequest(res.id, suggestion.workspaceId)
+          },
+        });
+      }
       setResources(prev => [...prev, res]);
       setNewUrl('');
       setIsAdding(false);
@@ -151,10 +180,10 @@ export function ResourceList({ workspaceId, layout }: { workspaceId: string, lay
           <p className="text-xs text-slate-500">{resources.length} items collected</p>
         </div>
         <div className="flex gap-2">
-          <Button onClick={handleAutoOrganize} variant="ghost" size="sm" className="text-blue-400 hover:bg-blue-400/10">
+          <Button onClick={handleAutoOrganize} variant="ghost" size="sm" className="text-blue-400 hover:bg-blue-400/10 h-9">
             <Wand2 className="w-4 h-4 mr-2" /> Auto-Group
           </Button>
-          <Button onClick={() => setIsAdding(true)} size="sm" className="bg-blue-600 hover:bg-blue-700">
+          <Button onClick={() => setIsAdding(true)} size="sm" className="bg-blue-600 hover:bg-blue-700 h-9 shadow-lg shadow-blue-500/20">
             <Plus className="w-4 h-4 mr-2" /> Add Link
           </Button>
         </div>
@@ -163,13 +192,24 @@ export function ResourceList({ workspaceId, layout }: { workspaceId: string, lay
         <form onSubmit={handleAdd} className="p-4 rounded-xl bg-slate-900 border border-slate-800 animate-in slide-in-from-top-2">
           <div className="space-y-3">
             <div className="flex gap-2">
-              <Input autoFocus placeholder="Paste URL (e.g. google.com)" className="bg-slate-950" value={newUrl} onChange={(e) => setNewUrl(e.target.value)} />
-              <Button type="submit">Add</Button>
+              <Input autoFocus placeholder="Paste URL (e.g. google.com)" className="bg-slate-950 border-slate-800" value={newUrl} onChange={(e) => setNewUrl(e.target.value)} />
+              <Button type="submit" className="bg-blue-600 hover:bg-blue-700">Add</Button>
             </div>
             {suggestion && (
-              <div className="flex items-center gap-2 text-xs text-blue-400 bg-blue-400/5 p-2 rounded-lg border border-blue-400/20">
-                <Sparkles className="w-3 h-3" />
-                Suggested Space: <strong>{suggestion.workspaceName}</strong>
+              <div className="flex items-center justify-between gap-2 text-xs text-blue-400 bg-blue-400/5 p-2 rounded-lg border border-blue-400/20">
+                <div className="flex items-center gap-2">
+                  <ArrowRightLeft className="w-3 h-3" />
+                  Suggested Space: <strong>{suggestion.workspaceName}</strong>
+                </div>
+                <Button 
+                  type="button" 
+                  variant="ghost" 
+                  size="sm" 
+                  className="h-6 text-[10px] bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-400/20"
+                  onClick={handleAdd}
+                >
+                  Accept & Add
+                </Button>
               </div>
             )}
           </div>
@@ -183,11 +223,11 @@ export function ResourceList({ workspaceId, layout }: { workspaceId: string, lay
                 <button onClick={() => toggleGroup(group.id)} className="flex items-center gap-2 text-xs font-bold text-slate-500 uppercase tracking-widest hover:text-slate-300 transition-colors">
                   {collapsedGroups.has(group.id) ? <ChevronRight className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                   {group.name}
-                  <Badge variant="outline" className="ml-2 bg-slate-900 border-slate-800 text-[10px] py-0">{group.items.length}</Badge>
+                  <Badge variant="outline" className="ml-2 bg-slate-900 border-slate-800 text-[10px] py-0 h-4">{group.items.length}</Badge>
                 </button>
                 {!collapsedGroups.has(group.id) && (
                   <div className={cn("grid gap-3", layout.columns === 1 ? "grid-cols-1" : layout.columns === 2 ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1 md:grid-cols-2 lg:grid-cols-3")}>
-                    {group.items.map(res => <SortableResource key={res.id} resource={res} columns={layout.columns} onDelete={id => setResources(p => p.filter(r => r.id !== id))} />)}
+                    {group.items.map(res => <SortableResource key={res.id} resource={res} columns={layout.columns} onDelete={handleDelete} />)}
                   </div>
                 )}
               </div>
@@ -196,12 +236,12 @@ export function ResourceList({ workspaceId, layout }: { workspaceId: string, lay
               <div className="space-y-3">
                 <div className="text-xs font-bold text-slate-500 uppercase tracking-widest">General Resources</div>
                 <div className={cn("grid gap-3", layout.columns === 1 ? "grid-cols-1" : layout.columns === 2 ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1 md:grid-cols-2 lg:grid-cols-3")}>
-                  {ungrouped.map(res => <SortableResource key={res.id} resource={res} columns={layout.columns} onDelete={id => setResources(p => p.filter(r => r.id !== id))} />)}
+                  {ungrouped.map(res => <SortableResource key={res.id} resource={res} columns={layout.columns} onDelete={handleDelete} />)}
                 </div>
               </div>
             )}
             {!isLoading && resources.length === 0 && (
-              <div className="text-center py-20 border-2 border-dashed border-slate-900 rounded-3xl text-slate-600">
+              <div className="text-center py-24 border-2 border-dashed border-slate-900 rounded-3xl text-slate-600 bg-slate-900/10">
                 No resources yet. Add your first link to get started.
               </div>
             )}
