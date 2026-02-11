@@ -3,18 +3,36 @@ export const MOCK_WORKSPACES: Workspace[] = [
   {
     id: 'ws-1',
     name: 'ZenWork Launch',
-    notes: 'Focus on the core loop. Minimalist design is key.',
+    notes: [
+      {
+        id: 'n1',
+        title: 'Project Goals',
+        content: 'Focus on the core loop. Minimalist design is key.',
+        createdAt: Date.now(),
+        updatedAt: Date.now()
+      }
+    ],
     tasks: [
       { id: 't1', text: 'Refactor sidebar logic', completed: true, createdAt: Date.now() },
       { id: 't2', text: 'Add drag and drop to resources', completed: false, createdAt: Date.now() },
     ],
+    layout: { columns: 1, resourceOrder: ['r1', 'r2'] },
     createdAt: Date.now(),
   },
   {
     id: 'ws-2',
     name: 'Personal Project',
-    notes: 'Remember to check the API documentation for Cloudflare Workers.',
+    notes: [
+      {
+        id: 'n2',
+        title: 'Research',
+        content: 'Remember to check the API documentation for Cloudflare Workers.',
+        createdAt: Date.now(),
+        updatedAt: Date.now()
+      }
+    ],
     tasks: [],
+    layout: { columns: 1, resourceOrder: ['r3'] },
     createdAt: Date.now(),
   }
 ];

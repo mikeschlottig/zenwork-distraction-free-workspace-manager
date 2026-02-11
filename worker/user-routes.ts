@@ -26,9 +26,17 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
     const data = await c.req.json();
     const ws = new WorkspaceEntity(c.env, id);
     if (!await ws.exists()) return notFound(c);
-    // Deep merge protection for sensitive arrays if needed, but entity.patch handles root level
     await ws.patch(data);
     return ok(c, await ws.getState());
+  });
+  app.patch('/api/workspaces/:id/notes/:noteId', async (c) => {
+    const id = c.req.param('id');
+    const noteId = c.req.param('noteId');
+    const data = await c.req.json();
+    const ws = new WorkspaceEntity(c.env, id);
+    if (!await ws.exists()) return notFound(c);
+    const updated = await ws.updateNote(noteId, data);
+    return ok(c, updated);
   });
   app.delete('/api/workspaces/:id', async (c) => {
     const id = c.req.param('id');
@@ -50,6 +58,12 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
       order: data.order ?? Date.now()
     });
     return ok(c, resource);
+  });
+  app.post('/api/resources/bulk-reorder', async (c) => {
+    const updates = await c.req.json();
+    if (!Array.isArray(updates)) return bad(c, 'Expected array');
+    await ResourceEntity.bulkReorder(c.env, updates);
+    return ok(c, { success: true });
   });
   app.patch('/api/resources/:id', async (c) => {
     const id = c.req.param('id');

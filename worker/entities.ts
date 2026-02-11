@@ -1,5 +1,5 @@
 import { IndexedEntity } from "./core-utils";
-import type { Workspace, Resource, Note, Task } from "@shared/types";
+import type { Workspace, Resource, Note } from "@shared/types";
 import { MOCK_WORKSPACES, MOCK_RESOURCES } from "@shared/mock-data";
 export class WorkspaceEntity extends IndexedEntity<Workspace> {
   static readonly entityName = "workspace";
@@ -12,14 +12,7 @@ export class WorkspaceEntity extends IndexedEntity<Workspace> {
     layout: { columns: 1, resourceOrder: [] },
     createdAt: 0
   };
-  // Convert legacy mock data (string notes) to array if necessary during seed
-  static seedData = MOCK_WORKSPACES.map(ws => ({
-    ...ws,
-    notes: typeof (ws as any).notes === 'string' 
-      ? [{ id: 'n1', title: 'Main Note', content: (ws as any).notes, createdAt: Date.now(), updatedAt: Date.now() }]
-      : (ws.notes || []),
-    layout: ws.layout || { columns: 1, resourceOrder: [] }
-  }));
+  static seedData = MOCK_WORKSPACES;
   async addNote(note: Note): Promise<Workspace> {
     return this.mutate(s => ({ ...s, notes: [...s.notes, note] }));
   }
@@ -55,5 +48,11 @@ export class ResourceEntity extends IndexedEntity<Resource> {
   }
   async move(newWorkspaceId: string): Promise<Resource> {
     return this.mutate(s => ({ ...s, workspaceId: newWorkspaceId }));
+  }
+  static async bulkReorder(env: any, updates: { id: string, order: number }[]): Promise<void> {
+    await Promise.all(updates.map(async (u) => {
+      const res = new ResourceEntity(env, u.id);
+      await res.patch({ order: u.order });
+    }));
   }
 }

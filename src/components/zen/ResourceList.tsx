@@ -5,21 +5,21 @@ import { ExternalLink, Trash2, Plus, Globe, GripVertical } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
-import { 
-  DndContext, 
-  closestCenter, 
-  KeyboardSensor, 
-  PointerSensor, 
-  useSensor, 
-  useSensors, 
-  DragEndEvent 
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent
 } from '@dnd-kit/core';
-import { 
-  arrayMove, 
-  SortableContext, 
-  sortableKeyboardCoordinates, 
-  verticalListSortingStrategy, 
-  useSortable 
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  useSortable
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 interface SortableItemProps {
@@ -72,16 +72,21 @@ export function ResourceList({ workspaceId }: { workspaceId: string }) {
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
     if (over && active.id !== over.id) {
-      setResources((items) => {
-        const oldIndex = items.findIndex((i) => i.id === active.id);
-        const newIndex = items.findIndex((i) => i.id === over.id);
-        const newArray = arrayMove(items, oldIndex, newIndex);
-        // Sync new orders to backend
-        newArray.forEach((res, idx) => {
-          api(`/api/resources/${res.id}`, { method: 'PATCH', body: JSON.stringify({ order: idx }) });
+      const oldIndex = resources.findIndex((i) => i.id === active.id);
+      const newIndex = resources.findIndex((i) => i.id === over.id);
+      const newArray = arrayMove(resources, oldIndex, newIndex);
+      setResources(newArray); // Optimistic Update
+      try {
+        await api('/api/resources/bulk-reorder', {
+          method: 'POST',
+          body: JSON.stringify(newArray.map((res, idx) => ({ id: res.id, order: idx })))
         });
-        return newArray;
-      });
+      } catch (err) {
+        toast.error('Failed to sync reordering');
+        // Revert on failure
+        const data = await api<Resource[]>(`/api/workspaces/${workspaceId}/resources`);
+        setResources(data);
+      }
     }
   };
   const handleAdd = async (e: React.FormEvent) => {
@@ -101,24 +106,12 @@ export function ResourceList({ workspaceId }: { workspaceId: string }) {
       toast.error('Failed to add resource');
     }
   };
-  const handleDropFromExternal = async (e: React.DragEvent) => {
-    e.preventDefault();
-    const url = e.dataTransfer.getData('text/plain') || e.dataTransfer.getData('text/uri-list');
-    if (url && (url.startsWith('http') || url.includes('.'))) {
-      setNewUrl(url);
-      setIsAdding(true);
-    }
-  };
   return (
-    <div 
-      className="space-y-4 max-w-4xl mx-auto min-h-[300px]"
-      onDragOver={(e) => e.preventDefault()}
-      onDrop={handleDropFromExternal}
-    >
+    <div className="space-y-4 max-w-4xl mx-auto min-h-[300px]">
       <div className="flex justify-between items-center mb-6">
         <div>
           <h3 className="text-lg font-semibold text-slate-100">Saved Resources</h3>
-          <p className="text-xs text-slate-500">Drag links from browser to add them instantly</p>
+          <p className="text-xs text-slate-500">Links organized in this space</p>
         </div>
         <Button onClick={() => setIsAdding(true)} variant="outline" className="bg-blue-500/10 border-blue-500/30 text-blue-400">
           <Plus className="w-4 h-4 mr-2" />
@@ -144,7 +137,7 @@ export function ResourceList({ workspaceId }: { workspaceId: string }) {
             ))}
             {resources.length === 0 && !isAdding && (
               <div className="text-center py-12 text-slate-500 bg-slate-900/20 rounded-2xl border border-dashed border-slate-800">
-                Drop links here or click "Add Resource"
+                Click "Add Resource" to start building your workspace
               </div>
             )}
           </div>

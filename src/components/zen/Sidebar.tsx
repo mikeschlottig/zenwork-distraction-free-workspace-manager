@@ -5,8 +5,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useDroppable } from '@dnd-kit/core';
 import type { Workspace } from '@shared/types';
-import { api } from '@/lib/api-client';
-import { toast } from 'sonner';
 interface SidebarItemProps {
   ws: Workspace;
   isActive: boolean;
@@ -22,16 +20,16 @@ function SidebarItem({ ws, isActive, onSelect, onDelete }: SidebarItemProps) {
     <div
       ref={setNodeRef}
       className={cn(
-        "group flex items-center justify-between px-3 py-2 rounded-md transition-all cursor-pointer relative",
+        "group flex items-center justify-between px-3 py-2.5 rounded-lg transition-all cursor-pointer relative",
         isActive
-          ? "bg-blue-600/10 text-blue-400 border border-blue-500/20"
-          : "text-slate-400 hover:bg-slate-800 hover:text-slate-200",
+          ? "bg-blue-600/10 text-blue-400 border border-blue-500/20 shadow-sm"
+          : "text-slate-400 hover:bg-slate-800/50 hover:text-slate-200",
         isOver && "ring-2 ring-blue-500 bg-blue-500/20"
       )}
       onClick={() => onSelect(ws.id)}
     >
-      <div className="flex items-center gap-2 truncate relative z-10">
-        <Layout className="w-4 h-4" />
+      <div className="flex items-center gap-3 truncate relative z-10">
+        <Layout className={cn("w-4 h-4", isActive ? "text-blue-500" : "text-slate-500")} />
         <span className="truncate font-medium">{ws.name}</span>
       </div>
       {isOver && (
@@ -70,32 +68,32 @@ export function Sidebar({ workspaces, activeId, onSelect, onCreate, onDelete }: 
     }
   };
   return (
-    <aside className="w-64 bg-slate-900 border-r border-slate-800 flex flex-col h-full shrink-0">
-      <div className="p-6 flex items-center gap-3">
-        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-fuchsia-500 flex items-center justify-center">
+    <aside className="w-64 bg-slate-950 border-r border-slate-900 flex flex-col h-full shrink-0">
+      <div className="p-6 pb-8 flex items-center gap-3">
+        <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-fuchsia-500 flex items-center justify-center shadow-lg shadow-blue-500/20">
           <Zap className="w-5 h-5 text-white" />
         </div>
         <h1 className="text-xl font-bold tracking-tight text-white">ZenWork</h1>
       </div>
-      <div className="flex-1 overflow-y-auto px-3 space-y-1">
-        <div className="px-3 mb-2 text-xs font-semibold text-slate-500 uppercase tracking-wider">
-          Your Spaces
+      <div className="flex-1 overflow-y-auto px-4 space-y-2">
+        <div className="px-3 mb-2 text-[11px] font-bold text-slate-600 uppercase tracking-widest">
+          Your Workspaces
         </div>
         {workspaces.map((ws) => (
-          <SidebarItem 
-            key={ws.id} 
-            ws={ws} 
-            isActive={activeId === ws.id} 
-            onSelect={onSelect} 
-            onDelete={onDelete} 
+          <SidebarItem
+            key={ws.id}
+            ws={ws}
+            isActive={activeId === ws.id}
+            onSelect={onSelect}
+            onDelete={onDelete}
           />
         ))}
         {isCreating ? (
-          <form onSubmit={handleSubmit} className="px-3 py-2 animate-in fade-in slide-in-from-top-1">
+          <form onSubmit={handleSubmit} className="px-2 py-1 animate-in fade-in slide-in-from-top-1">
             <Input
               autoFocus
-              className="h-8 bg-slate-800 border-slate-700 text-sm focus:ring-blue-500/50"
-              placeholder="Space name..."
+              className="h-9 bg-slate-900 border-slate-800 text-sm focus:ring-blue-500/50"
+              placeholder="Workspace name..."
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
               onBlur={() => !newName && setIsCreating(false)}
@@ -104,7 +102,7 @@ export function Sidebar({ workspaces, activeId, onSelect, onCreate, onDelete }: 
         ) : (
           <Button
             variant="ghost"
-            className="w-full justify-start text-slate-500 hover:text-blue-400 hover:bg-blue-400/5 mt-2"
+            className="w-full justify-start text-slate-500 hover:text-blue-400 hover:bg-blue-400/5 px-3 py-2.5 rounded-lg"
             onClick={() => setIsCreating(true)}
           >
             <Plus className="w-4 h-4 mr-2" />
@@ -112,9 +110,10 @@ export function Sidebar({ workspaces, activeId, onSelect, onCreate, onDelete }: 
           </Button>
         )}
       </div>
-      <div className="p-4 border-t border-slate-800">
-        <div className="text-[10px] text-slate-600 text-center uppercase tracking-widest font-bold">
-          Phase 2 Active
+      <div className="p-6 border-t border-slate-900">
+        <div className="flex items-center gap-2 text-[10px] text-slate-700 font-medium">
+          <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+          WORKSPACE SYNCED
         </div>
       </div>
     </aside>
