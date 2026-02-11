@@ -1,253 +1,120 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { api } from '@/lib/api-client';
-import type { Resource, WorkspaceLayout, Workspace } from '@shared/types';
-import { ExternalLink, Trash2, Plus, Globe, GripVertical, Sparkles, ChevronDown, ChevronRight, Wand2, Loader2, ArrowRightLeft } from 'lucide-react';
+import type { Resource } from '@shared/types';
+import { ExternalLink, Trash2, Plus, Globe, GripVertical } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
-import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
-import { arrayMove, SortableContext, sortableKeyboardCoordinates, rectSortingStrategy, useSortable } from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
-import { cn } from '@/lib/utils';
-import { Badge } from '@/components/ui/badge';
-interface SortableItemProps {
-  resource: Resource;
-  onDelete: (id: string) => Promise<void>;
-  columns: number;
+interface ResourceListProps {
+  workspaceId: string;
 }
-function SortableResource({ resource, onDelete, columns }: SortableItemProps) {
-  const [isDeleting, setIsDeleting] = useState(false);
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: resource.id });
-  const style = { transform: CSS.Transform.toString(transform), transition, zIndex: isDragging ? 50 : 'auto' };
-  const handleDeleteClick = async () => {
-    if (isDeleting) return;
-    setIsDeleting(true);
-    try {
-      await onDelete(resource.id);
-    } finally {
-      setIsDeleting(false);
-    }
-  };
-  return (
-    <div ref={setNodeRef} style={style} className={cn("group flex flex-col p-3 bg-slate-900/50 border border-slate-800/50 rounded-xl hover:border-blue-500/30 hover:bg-slate-900 transition-all shadow-sm", isDragging && "opacity-50 scale-95 shadow-2xl border-blue-500/50", columns === 1 ? "flex-row items-center" : "items-start gap-3")}>
-      <div className={cn("flex items-center gap-3 flex-1 truncate w-full", columns === 1 ? "" : "flex-col items-start")}>
-        <div className="flex items-center w-full gap-2">
-          <button {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing p-1 text-slate-700 hover:text-slate-500"><GripVertical className="w-4 h-4" /></button>
-          <div className="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center text-slate-500 shrink-0">
-            {resource.favicon ? <img src={resource.favicon} alt="" className="w-4 h-4" /> : <Globe className="w-4 h-4" />}
-          </div>
-          {columns > 1 && <div className="flex-1 truncate"><span className="text-xs font-semibold text-slate-200 truncate block">{resource.title}</span></div>}
-        </div>
-        <div className={cn("flex flex-col truncate w-full", columns === 1 ? "" : "mt-1")}>
-          {columns === 1 && <span className="text-sm font-semibold text-slate-200 truncate">{resource.title}</span>}
-          <span className="text-[10px] text-slate-500 truncate">{resource.url}</span>
-        </div>
-      </div>
-      <div className={cn("flex items-center gap-1", columns === 1 ? "" : "w-full justify-end border-t border-slate-800/50 pt-2")}>
-        <a href={resource.url} target="_blank" rel="noopener noreferrer" className="p-1.5 text-slate-500 hover:text-white hover:bg-slate-800 rounded-lg transition-all"><ExternalLink className="w-3.5 h-3.5" /></a>
-        <button 
-          onClick={handleDeleteClick} 
-          disabled={isDeleting}
-          className="p-1.5 text-slate-500 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-all disabled:opacity-50"
-        >
-          {isDeleting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
-        </button>
-      </div>
-    </div>
-  );
-}
-export function ResourceList({ workspaceId, layout, onMoveRequest }: { workspaceId: string, layout: WorkspaceLayout, onMoveRequest?: (resourceId: string, targetWsId: string) => void }) {
+export function ResourceList({ workspaceId }: ResourceListProps) {
   const [resources, setResources] = useState<Resource[]>([]);
-  const [workspace, setWorkspace] = useState<Workspace | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
   const [newUrl, setNewUrl] = useState('');
-  const [suggestion, setSuggestion] = useState<{ workspaceId: string, workspaceName: string } | null>(null);
   const [isAdding, setIsAdding] = useState(false);
-  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }), useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }));
-  const loadResources = async (id: string) => {
-    try {
-      const [resData, wsData] = await Promise.all([
-        api<Resource[]>(`/api/workspaces/${id}/resources`),
-        api<Workspace>(`/api/workspaces/${id}`)
-      ]);
-      setResources(resData);
-      setWorkspace(wsData);
-    } catch (err) {
-      console.error(err);
-    }
-  };
   useEffect(() => {
-    setIsLoading(true);
-    loadResources(workspaceId).finally(() => setIsLoading(false));
+    const load = async () => {
+      try {
+        const data = await api<Resource[]>(`/api/workspaces/${workspaceId}/resources`);
+        setResources(data);
+      } catch (err) {
+        console.error(err);
+      }
+    };
+    load();
   }, [workspaceId]);
-  useEffect(() => {
-    if (newUrl.length > 5) {
-      const t = setTimeout(async () => {
-        try {
-          const data = await api<{ workspaceId: string, workspaceName: string } | null>(`/api/resources/suggest-workspace?url=${encodeURIComponent(newUrl)}`);
-          setSuggestion(data?.workspaceId !== workspaceId ? data : null);
-        } catch {
-          setSuggestion(null);
-        }
-      }, 500);
-      return () => clearTimeout(t);
-    } else {
-      setSuggestion(null);
-    }
-  }, [newUrl, workspaceId]);
-  const handleAutoOrganize = async () => {
+  const handleAdd = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newUrl) return;
     try {
-      toast.loading("Organizing resources...", { id: "organize" });
-      const updated = await api<Workspace>(`/api/workspaces/${workspaceId}/auto-organize`, { method: 'POST' });
-      setWorkspace(updated);
-      const resData = await api<Resource[]>(`/api/workspaces/${workspaceId}/resources`);
-      setResources(resData);
-      toast.success("Organized by domain!", { id: "organize" });
-    } catch {
-      toast.error("Failed to organize", { id: "organize" });
+      const title = newUrl.replace(/^https?:\/\/(www\.)?/, '').split('/')[0];
+      const res = await api<Resource>('/api/resources', {
+        method: 'POST',
+        body: JSON.stringify({ workspaceId, url: newUrl, title }),
+      });
+      setResources(prev => [...prev, res]);
+      setNewUrl('');
+      setIsAdding(false);
+      toast.success('Resource added');
+    } catch (err) {
+      toast.error('Failed to add resource');
     }
   };
   const handleDelete = async (id: string) => {
     try {
       await api(`/api/resources/${id}`, { method: 'DELETE' });
       setResources(prev => prev.filter(r => r.id !== id));
-      toast.success('Resource deleted');
     } catch (err) {
       toast.error('Failed to delete resource');
-      throw err;
     }
-  };
-  const handleDragEnd = async (event: DragEndEvent) => {
-    const { active, over } = event;
-    if (over && active.id !== over.id) {
-      const oldIndex = resources.findIndex((i) => i.id === active.id);
-      const newIndex = resources.findIndex((i) => i.id === over.id);
-      if (oldIndex !== -1 && newIndex !== -1) {
-        const newArray = arrayMove(resources, oldIndex, newIndex);
-        setResources(newArray);
-        api('/api/resources/bulk-reorder', { method: 'POST', body: JSON.stringify(newArray.map((res, idx) => ({ id: res.id, order: idx }))) });
-      }
-    }
-  };
-  const handleAdd = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newUrl) return;
-    try {
-      const title = newUrl.replace(/^https?:\/\/(www\.)?/, '').split('/')[0];
-      const res = await api<Resource>('/api/resources', { method: 'POST', body: JSON.stringify({ workspaceId, url: newUrl, title, order: resources.length }) });
-      if (suggestion && onMoveRequest) {
-        toast('Found a better home?', {
-          description: `This resource belongs in "${suggestion.workspaceName}".`,
-          action: {
-            label: 'Move Now',
-            onClick: () => onMoveRequest(res.id, suggestion.workspaceId)
-          },
-        });
-      }
-      setResources(prev => [...prev, res]);
-      setNewUrl('');
-      setIsAdding(false);
-      toast.success('Resource added');
-    } catch { toast.error('Failed to add resource'); }
-  };
-  if (isLoading) {
-    return (
-      <div className="flex flex-col items-center justify-center py-20 gap-4 text-slate-500">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
-        <p className="text-sm">Fetching resources...</p>
-      </div>
-    );
-  }
-  const groups = workspace?.groups || [];
-  const groupedResources = groups.map(g => ({
-    ...g,
-    items: resources.filter(r => r.groupId === g.id)
-  })).filter(g => g.items.length > 0);
-  const ungrouped = resources.filter(r => !r.groupId || !groups.find(g => g.id === r.groupId));
-  const toggleGroup = (id: string) => {
-    const next = new Set(collapsedGroups);
-    if (next.has(id)) next.delete(id); else next.add(id);
-    setCollapsedGroups(next);
   };
   return (
-    <div className="space-y-6 max-w-6xl mx-auto min-h-[400px]">
-      <div className="flex justify-between items-center">
-        <div>
-          <h3 className="text-lg font-semibold text-slate-100 flex items-center gap-2">
-            Resources <Sparkles className="w-4 h-4 text-blue-400" />
-          </h3>
-          <p className="text-xs text-slate-500">{resources.length} items collected</p>
-        </div>
-        <div className="flex gap-2">
-          <Button onClick={handleAutoOrganize} variant="ghost" size="sm" className="text-blue-400 hover:bg-blue-400/10 h-9">
-            <Wand2 className="w-4 h-4 mr-2" /> Auto-Group
-          </Button>
-          <Button onClick={() => setIsAdding(true)} size="sm" className="bg-blue-600 hover:bg-blue-700 h-9 shadow-lg shadow-blue-500/20">
-            <Plus className="w-4 h-4 mr-2" /> Add Link
-          </Button>
-        </div>
+    <div className="space-y-4 max-w-4xl mx-auto">
+      <div className="flex justify-between items-center mb-6">
+        <h3 className="text-lg font-semibold text-slate-100">Saved Links</h3>
+        <Button 
+          onClick={() => setIsAdding(true)} 
+          variant="outline" 
+          className="bg-blue-500/10 border-blue-500/30 text-blue-400 hover:bg-blue-500/20"
+        >
+          <Plus className="w-4 h-4 mr-2" />
+          Add Resource
+        </Button>
       </div>
       {isAdding && (
-        <form onSubmit={handleAdd} className="p-4 rounded-xl bg-slate-900 border border-slate-800 animate-in slide-in-from-top-2">
-          <div className="space-y-3">
-            <div className="flex gap-2">
-              <Input autoFocus placeholder="Paste URL (e.g. google.com)" className="bg-slate-950 border-slate-800" value={newUrl} onChange={(e) => setNewUrl(e.target.value)} />
-              <Button type="submit" className="bg-blue-600 hover:bg-blue-700">Add</Button>
-            </div>
-            {suggestion && (
-              <div className="flex items-center justify-between gap-2 text-xs text-blue-400 bg-blue-400/5 p-2 rounded-lg border border-blue-400/20">
-                <div className="flex items-center gap-2">
-                  <ArrowRightLeft className="w-3 h-3" />
-                  Suggested Space: <strong>{suggestion.workspaceName}</strong>
-                </div>
-                <Button 
-                  type="button" 
-                  variant="ghost" 
-                  size="sm" 
-                  className="h-6 text-[10px] bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-400/20"
-                  onClick={handleAdd}
-                >
-                  Accept & Add
-                </Button>
-              </div>
-            )}
+        <form onSubmit={handleAdd} className="p-4 rounded-xl bg-slate-900 border border-slate-800 animate-in slide-in-from-top-2 mb-6">
+          <div className="flex gap-2">
+            <Input 
+              autoFocus
+              placeholder="Paste URL here..."
+              className="bg-slate-950 border-slate-800"
+              value={newUrl}
+              onChange={(e) => setNewUrl(e.target.value)}
+            />
+            <Button type="submit" className="bg-blue-600 hover:bg-blue-700">Add</Button>
+            <Button type="button" variant="ghost" onClick={() => setIsAdding(false)}>Cancel</Button>
           </div>
         </form>
       )}
-      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-        <SortableContext items={resources.map(r => r.id)} strategy={rectSortingStrategy}>
-          <div className="space-y-8">
-            {groupedResources.map(group => (
-              <div key={group.id} className="space-y-3">
-                <button onClick={() => toggleGroup(group.id)} className="flex items-center gap-2 text-xs font-bold text-slate-500 uppercase tracking-widest hover:text-slate-300 transition-colors">
-                  {collapsedGroups.has(group.id) ? <ChevronRight className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                  {group.name}
-                  <Badge variant="outline" className="ml-2 bg-slate-900 border-slate-800 text-[10px] py-0 h-4">{group.items.length}</Badge>
-                </button>
-                {!collapsedGroups.has(group.id) && (
-                  <div className={cn("grid gap-3", layout.columns === 1 ? "grid-cols-1" : layout.columns === 2 ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1 md:grid-cols-2 lg:grid-cols-3")}>
-                    {group.items.map(res => <SortableResource key={res.id} resource={res} columns={layout.columns} onDelete={handleDelete} />)}
-                  </div>
-                )}
+      <div className="grid grid-cols-1 gap-2">
+        {resources.map((res) => (
+          <div 
+            key={res.id} 
+            className="group flex items-center justify-between p-4 bg-slate-900/50 border border-slate-800/50 rounded-xl hover:border-blue-500/30 hover:bg-slate-900 transition-all"
+          >
+            <div className="flex items-center gap-4 flex-1 truncate">
+              <div className="w-10 h-10 rounded-lg bg-slate-800 flex items-center justify-center text-slate-500">
+                {res.favicon ? <img src={res.favicon} alt="" className="w-5 h-5" /> : <Globe className="w-5 h-5" />}
               </div>
-            ))}
-            {ungrouped.length > 0 && (
-              <div className="space-y-3">
-                <div className="text-xs font-bold text-slate-500 uppercase tracking-widest">General Resources</div>
-                <div className={cn("grid gap-3", layout.columns === 1 ? "grid-cols-1" : layout.columns === 2 ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1 md:grid-cols-2 lg:grid-cols-3")}>
-                  {ungrouped.map(res => <SortableResource key={res.id} resource={res} columns={layout.columns} onDelete={handleDelete} />)}
-                </div>
+              <div className="flex flex-col truncate">
+                <span className="text-sm font-semibold text-slate-200 truncate">{res.title}</span>
+                <span className="text-xs text-slate-500 truncate">{res.url}</span>
               </div>
-            )}
-            {!isLoading && resources.length === 0 && (
-              <div className="text-center py-24 border-2 border-dashed border-slate-900 rounded-3xl text-slate-600 bg-slate-900/10">
-                No resources yet. Add your first link to get started.
-              </div>
-            )}
+            </div>
+            <div className="flex items-center gap-2">
+              <a 
+                href={res.url} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="p-2 text-slate-500 hover:text-blue-400 hover:bg-blue-400/10 rounded-lg transition-all"
+              >
+                <ExternalLink className="w-4 h-4" />
+              </a>
+              <button 
+                onClick={() => handleDelete(res.id)}
+                className="p-2 text-slate-500 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-all"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </div>
           </div>
-        </SortableContext>
-      </DndContext>
+        ))}
+        {resources.length === 0 && !isAdding && (
+          <div className="text-center py-12 text-slate-500 bg-slate-900/20 rounded-2xl border border-dashed border-slate-800">
+            No resources yet. Add your first link to get started.
+          </div>
+        )}
+      </div>
     </div>
   );
 }

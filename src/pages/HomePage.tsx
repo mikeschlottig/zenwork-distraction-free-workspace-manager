@@ -1,138 +1,78 @@
-// Home page of the app.
-// Currently a demo placeholder "please wait" screen.
-// Replace this file with your actual app UI. Do not delete it to use some other file as homepage. Simply replace the entire contents of this file.
-
-import { useEffect, useMemo, useState } from 'react'
-import { Sparkles } from 'lucide-react'
-
-import { ThemeToggle } from '@/components/ThemeToggle'
-import { HAS_TEMPLATE_DEMO, TemplateDemo } from '@/components/TemplateDemo'
-import { Button } from '@/components/ui/button'
-import { Toaster, toast } from '@/components/ui/sonner'
-
-function formatDuration(ms: number): string {
-  const total = Math.max(0, Math.floor(ms / 1000))
-  const m = Math.floor(total / 60)
-  const s = total % 60
-  return `${m}:${s.toString().padStart(2, '0')}`
-}
-
+import React, { useState, useEffect } from 'react';
+import { Sidebar } from '@/components/zen/Sidebar';
+import { WorkspaceView } from '@/components/zen/WorkspaceView';
+import { Toaster } from '@/components/ui/sonner';
+import { api } from '@/lib/api-client';
+import type { Workspace } from '@shared/types';
+import { Loader2 } from 'lucide-react';
 export function HomePage() {
-  const [coins, setCoins] = useState(0)
-  const [isRunning, setIsRunning] = useState(false)
-  const [startedAt, setStartedAt] = useState<number | null>(null)
-  const [elapsedMs, setElapsedMs] = useState(0)
-
+  const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   useEffect(() => {
-    if (!isRunning || startedAt === null) return
-
-    const t = setInterval(() => {
-      setElapsedMs(Date.now() - startedAt)
-    }, 250)
-
-    return () => clearInterval(t)
-  }, [isRunning, startedAt])
-
-  const formatted = useMemo(() => formatDuration(elapsedMs), [elapsedMs])
-
-  const onPleaseWait = () => {
-    setCoins((c) => c + 1)
-
-    if (!isRunning) {
-      // Resume from the current elapsed time
-      setStartedAt(Date.now() - elapsedMs)
-      setIsRunning(true)
-      toast.success('Building your app…', {
-        description: "Hang tight — we're setting everything up.",
-      })
-      return
+    const load = async () => {
+      try {
+        const data = await api<Workspace[]>('/api/workspaces');
+        setWorkspaces(data);
+        if (data.length > 0) setActiveId(data[0].id);
+      } catch (err) {
+        console.error('Failed to load workspaces', err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    load();
+  }, []);
+  const activeWorkspace = workspaces.find(w => w.id === activeId);
+  const handleCreateWorkspace = async (name: string) => {
+    try {
+      const newWs = await api<Workspace>('/api/workspaces', {
+        method: 'POST',
+        body: JSON.stringify({ name }),
+      });
+      setWorkspaces(prev => [...prev, newWs]);
+      setActiveId(newWs.id);
+    } catch (err) {
+      console.error(err);
     }
-
-    setIsRunning(false)
-    toast.info('Still working…', {
-      description: 'You can come back in a moment.',
-    })
-  }
-
-  const onReset = () => {
-    setCoins(0)
-    setIsRunning(false)
-    setStartedAt(null)
-    setElapsedMs(0)
-    toast('Reset complete')
-  }
-
-  const onAddCoin = () => {
-    setCoins((c) => c + 1)
-    toast('Coin added')
-  }
-
-  return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-background text-foreground p-4 overflow-hidden relative">
-      <ThemeToggle />
-      <div className="absolute inset-0 bg-gradient-rainbow opacity-10 dark:opacity-20 pointer-events-none" />
-
-      <div className="text-center space-y-8 relative z-10 animate-fade-in w-full">
-        <div className="flex justify-center">
-          <div className="w-16 h-16 rounded-2xl bg-gradient-primary flex items-center justify-center shadow-primary floating">
-            <Sparkles className="w-8 h-8 text-white rotating" />
-          </div>
-        </div>
-
-        <div className="space-y-3">
-          <h1 className="text-5xl md:text-7xl font-display font-bold text-balance leading-tight">
-            Creating your <span className="text-gradient">app</span>
-          </h1>
-          <p className="text-lg md:text-xl text-muted-foreground max-w-xl mx-auto text-pretty">
-            Your application would be ready soon.
-          </p>
-        </div>
-
-        {HAS_TEMPLATE_DEMO ? (
-          <div className="max-w-5xl mx-auto text-left">
-            <TemplateDemo />
-          </div>
-        ) : (
-          <>
-            <div className="flex justify-center gap-4">
-              <Button
-                size="lg"
-                onClick={onPleaseWait}
-                className="btn-gradient px-8 py-4 text-lg font-semibold hover:-translate-y-0.5 transition-all duration-200"
-                aria-live="polite"
-              >
-                Please Wait
-              </Button>
-            </div>
-
-            <div className="flex items-center justify-center gap-6 text-sm text-muted-foreground">
-              <div>
-                Time elapsed:{' '}
-                <span className="font-medium tabular-nums text-foreground">{formatted}</span>
-              </div>
-              <div>
-                Coins:{' '}
-                <span className="font-medium tabular-nums text-foreground">{coins}</span>
-              </div>
-            </div>
-
-            <div className="flex justify-center gap-2">
-              <Button variant="outline" size="sm" onClick={onReset}>
-                Reset
-              </Button>
-              <Button variant="outline" size="sm" onClick={onAddCoin}>
-                Add Coin
-              </Button>
-            </div>
-          </>
-        )}
+  };
+  const handleDeleteWorkspace = async (id: string) => {
+    try {
+      await api(`/api/workspaces/${id}`, { method: 'DELETE' });
+      setWorkspaces(prev => prev.filter(w => w.id !== id));
+      if (activeId === id) setActiveId(workspaces[0]?.id || null);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+  if (isLoading) {
+    return (
+      <div className="h-screen w-full flex items-center justify-center bg-slate-950">
+        <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
       </div>
-
-      <footer className="absolute bottom-8 text-center text-muted-foreground/80">
-        <p>Powered by Cloudflare</p>
-      </footer>
-
-      <Toaster richColors closeButton />
+    );
+  }
+  return (
+    <div className="flex h-screen bg-slate-950 text-slate-200 overflow-hidden">
+      <Sidebar 
+        workspaces={workspaces} 
+        activeId={activeId} 
+        onSelect={setActiveId}
+        onCreate={handleCreateWorkspace}
+        onDelete={handleDeleteWorkspace}
+      />
+      <main className="flex-1 relative overflow-auto">
+        {activeWorkspace ? (
+          <WorkspaceView workspace={activeWorkspace} onUpdate={(updated) => {
+            setWorkspaces(prev => prev.map(w => w.id === updated.id ? updated : w));
+          }} />
+        ) : (
+          <div className="h-full flex items-center justify-center text-slate-500">
+            Select or create a space to begin
+          </div>
+        )}
+      </main>
+      <Toaster richColors position="bottom-right" />
     </div>
-  )
+  );
 }
