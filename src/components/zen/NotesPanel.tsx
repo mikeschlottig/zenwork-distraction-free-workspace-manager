@@ -24,14 +24,14 @@ function NoteCard({ note, workspaceId, onUpdate, onDelete }: NoteCardProps) {
         method: 'PATCH',
         body: JSON.stringify({ title: t, content: c }),
       });
-      const savedNote = updatedWs.notes.find(n => n.id === note.id);
+      const savedNote = Array.isArray(updatedWs.notes) ? updatedWs.notes.find(n => n.id === note.id) : note;
       if (savedNote) onUpdate(savedNote);
     } catch (err) {
       toast.error('Failed to auto-save note');
     } finally {
       setIsSaving(false);
     }
-  }, [note.id, workspaceId, onUpdate]);
+  }, [note.id, workspaceId, onUpdate, note]);
   useEffect(() => {
     const timer = setTimeout(() => {
       if (title !== note.title || content !== note.content) {
@@ -39,7 +39,7 @@ function NoteCard({ note, workspaceId, onUpdate, onDelete }: NoteCardProps) {
       }
     }, 800);
     return () => clearTimeout(timer);
-  }, [title, content, note.title, note.content, performSave]);
+  }, [title, content, note, performSave]);
   return (
     <Card className="bg-slate-900/40 border-slate-800 hover:border-slate-700 transition-colors shadow-lg">
       <CardHeader className="p-4 pb-2 space-y-2">
@@ -79,6 +79,8 @@ function NoteCard({ note, workspaceId, onUpdate, onDelete }: NoteCardProps) {
   );
 }
 export function NotesPanel({ workspace, onUpdate }: { workspace: Workspace, onUpdate: (ws: Workspace) => void }) {
+  const safeNotes: Note[] = React.useMemo(() => Array.isArray(workspace.notes) ? workspace.notes : [], [workspace.notes]);
+
   const handleAddNote = async () => {
     const newNote: Note = {
       id: crypto.randomUUID(),
@@ -87,34 +89,35 @@ export function NotesPanel({ workspace, onUpdate }: { workspace: Workspace, onUp
       createdAt: Date.now(),
       updatedAt: Date.now()
     };
+    const newNotes = [...safeNotes, newNote];
     try {
       const updatedWs = await api<Workspace>(`/api/workspaces/${workspace.id}`, {
         method: 'PATCH',
-        body: JSON.stringify({ notes: [...workspace.notes, newNote] }),
+        body: JSON.stringify({ notes: newNotes }),
       });
       onUpdate(updatedWs);
       toast.success('Note added');
     } catch (err) {
+      onUpdate({...workspace, notes: newNotes});
       toast.error('Failed to add note');
     }
   };
   const handleDeleteNote = async (id: string) => {
+    const newNotes = safeNotes.filter(n => n.id !== id);
     try {
       const updatedWs = await api<Workspace>(`/api/workspaces/${workspace.id}`, {
         method: 'PATCH',
-        body: JSON.stringify({ notes: workspace.notes.filter(n => n.id !== id) }),
+        body: JSON.stringify({ notes: newNotes }),
       });
       onUpdate(updatedWs);
     } catch (err) {
+      onUpdate({...workspace, notes: newNotes});
       toast.error('Failed to delete note');
     }
   };
   const handleNoteUpdate = (updatedNote: Note) => {
-    const updatedWs = {
-      ...workspace,
-      notes: workspace.notes.map(n => n.id === updatedNote.id ? updatedNote : n)
-    };
-    onUpdate(updatedWs);
+    const newNotes = safeNotes.map(n => n.id === updatedNote.id ? updatedNote : n);
+    onUpdate({...workspace, notes: newNotes});
   };
   return (
     <div className="space-y-6 max-w-6xl mx-auto">
@@ -125,7 +128,7 @@ export function NotesPanel({ workspace, onUpdate }: { workspace: Workspace, onUp
           New Note
         </Button>
       </div>
-      {workspace.notes.length === 0 ? (
+      {safeNotes.length === 0 ? (
         <div className="text-center py-20 bg-slate-900/20 rounded-3xl border border-dashed border-slate-800">
           <div className="text-slate-500 mb-4">Capture your thoughts for this workspace.</div>
           <Button variant="outline" onClick={handleAddNote} className="border-slate-800">
@@ -134,7 +137,7 @@ export function NotesPanel({ workspace, onUpdate }: { workspace: Workspace, onUp
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {workspace.notes.sort((a,b) => b.updatedAt - a.updatedAt).map(note => (
+          {safeNotes.slice().sort((a,b) => b.updatedAt - a.updatedAt).map(note => (
             <NoteCard
               key={note.id}
               note={note}
