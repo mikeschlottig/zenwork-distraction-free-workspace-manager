@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '@/lib/api-client';
 import type { Resource, WorkspaceLayout, Workspace } from '@shared/types';
-import { ExternalLink, Trash2, Plus, Globe, GripVertical, Sparkles, ChevronDown, ChevronRight, Wand2 } from 'lucide-react';
+import { ExternalLink, Trash2, Plus, Globe, GripVertical, Sparkles, ChevronDown, ChevronRight, Wand2, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
@@ -43,27 +43,43 @@ function SortableResource({ resource, onDelete, columns }: SortableItemProps) {
 export function ResourceList({ workspaceId, layout }: { workspaceId: string, layout: WorkspaceLayout }) {
   const [resources, setResources] = useState<Resource[]>([]);
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [newUrl, setNewUrl] = useState('');
   const [suggestion, setSuggestion] = useState<{ workspaceId: string, workspaceName: string } | null>(null);
   const [isAdding, setIsAdding] = useState(false);
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }), useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }));
   useEffect(() => {
+    let active = true;
     const load = async () => {
-      const [resData, wsData] = await Promise.all([
-        api<Resource[]>(`/api/workspaces/${workspaceId}/resources`),
-        api<Workspace>(`/api/workspaces/${workspaceId}`)
-      ]);
-      setResources(resData);
-      setWorkspace(wsData);
+      setIsLoading(true);
+      try {
+        const [resData, wsData] = await Promise.all([
+          api<Resource[]>(`/api/workspaces/${workspaceId}/resources`),
+          api<Workspace>(`/api/workspaces/${workspaceId}`)
+        ]);
+        if (active) {
+          setResources(resData);
+          setWorkspace(wsData);
+        }
+      } catch (err) {
+        toast.error('Failed to load resources');
+      } finally {
+        if (active) setIsLoading(false);
+      }
     };
     load();
+    return () => { active = false; };
   }, [workspaceId]);
   useEffect(() => {
     if (newUrl.length > 5) {
       const t = setTimeout(async () => {
-        const data = await api<{ workspaceId: string, workspaceName: string } | null>(`/api/resources/suggest-workspace?url=${encodeURIComponent(newUrl)}`);
-        setSuggestion(data?.workspaceId !== workspaceId ? data : null);
+        try {
+          const data = await api<{ workspaceId: string, workspaceName: string } | null>(`/api/resources/suggest-workspace?url=${encodeURIComponent(newUrl)}`);
+          setSuggestion(data?.workspaceId !== workspaceId ? data : null);
+        } catch {
+          setSuggestion(null);
+        }
       }, 500);
       return () => clearTimeout(t);
     } else {
@@ -87,9 +103,11 @@ export function ResourceList({ workspaceId, layout }: { workspaceId: string, lay
     if (over && active.id !== over.id) {
       const oldIndex = resources.findIndex((i) => i.id === active.id);
       const newIndex = resources.findIndex((i) => i.id === over.id);
-      const newArray = arrayMove(resources, oldIndex, newIndex);
-      setResources(newArray);
-      api('/api/resources/bulk-reorder', { method: 'POST', body: JSON.stringify(newArray.map((res, idx) => ({ id: res.id, order: idx }))) });
+      if (oldIndex !== -1 && newIndex !== -1) {
+        const newArray = arrayMove(resources, oldIndex, newIndex);
+        setResources(newArray);
+        api('/api/resources/bulk-reorder', { method: 'POST', body: JSON.stringify(newArray.map((res, idx) => ({ id: res.id, order: idx }))) });
+      }
     }
   };
   const handleAdd = async (e: React.FormEvent) => {
@@ -104,6 +122,14 @@ export function ResourceList({ workspaceId, layout }: { workspaceId: string, lay
       toast.success('Resource added');
     } catch { toast.error('Failed to add resource'); }
   };
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 gap-4 text-slate-500">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+        <p className="text-sm">Fetching resources...</p>
+      </div>
+    );
+  }
   const groups = workspace?.groups || [];
   const groupedResources = groups.map(g => ({
     ...g,
@@ -172,6 +198,11 @@ export function ResourceList({ workspaceId, layout }: { workspaceId: string, lay
                 <div className={cn("grid gap-3", layout.columns === 1 ? "grid-cols-1" : layout.columns === 2 ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1 md:grid-cols-2 lg:grid-cols-3")}>
                   {ungrouped.map(res => <SortableResource key={res.id} resource={res} columns={layout.columns} onDelete={id => setResources(p => p.filter(r => r.id !== id))} />)}
                 </div>
+              </div>
+            )}
+            {!isLoading && resources.length === 0 && (
+              <div className="text-center py-20 border-2 border-dashed border-slate-900 rounded-3xl text-slate-600">
+                No resources yet. Add your first link to get started.
               </div>
             )}
           </div>

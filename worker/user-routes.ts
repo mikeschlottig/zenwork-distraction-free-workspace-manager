@@ -2,12 +2,18 @@ import { Hono } from "hono";
 import type { Env } from './core-utils';
 import { WorkspaceEntity, ResourceEntity } from "./entities";
 import { ok, bad, notFound } from './core-utils';
-import type { ResourceGroup, Resource } from "@shared/types";
+import type { ResourceGroup, Resource, Workspace } from "@shared/types";
 export function userRoutes(app: Hono<{ Bindings: Env }>) {
   app.get('/api/workspaces', async (c) => {
     await WorkspaceEntity.ensureSeed(c.env);
     const page = await WorkspaceEntity.list(c.env);
     return ok(c, page.items);
+  });
+  app.get('/api/workspaces/:id', async (c) => {
+    const id = c.req.param('id');
+    const ws = new WorkspaceEntity(c.env, id);
+    if (!await ws.exists()) return notFound(c);
+    return ok(c, await ws.getState());
   });
   app.post('/api/workspaces', async (c) => {
     const data = await c.req.json();
@@ -29,6 +35,40 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
     if (!await ws.exists()) return notFound(c);
     await ws.patch(data);
     return ok(c, await ws.getState());
+  });
+  app.post('/api/workspaces/auto-organize-all', async (c) => {
+    const { items: allWorkspaces } = await WorkspaceEntity.list(c.env, null, 100);
+    const { items: allResources } = await ResourceEntity.list(c.env, null, 1000);
+    const domainCountByWorkspace: Record<string, Record<string, number>> = {};
+    allResources.forEach(r => {
+      const domain = ResourceEntity.extractDomain(r.url);
+      if (!domainCountByWorkspace[domain]) domainCountByWorkspace[domain] = {};
+      domainCountByWorkspace[domain][r.workspaceId] = (domainCountByWorkspace[domain][r.workspaceId] || 0) + 1;
+    });
+    const domainPrimaries: Record<string, string> = {};
+    Object.entries(domainCountByWorkspace).forEach(([domain, counts]) => {
+      let maxCount = -1;
+      let primaryWs = "";
+      Object.entries(counts).forEach(([wsId, count]) => {
+        if (count > maxCount) {
+          maxCount = count;
+          primaryWs = wsId;
+        }
+      });
+      domainPrimaries[domain] = primaryWs;
+    });
+    const resourceUpdates: { id: string; patch: Partial<Resource> }[] = [];
+    allResources.forEach(r => {
+      const domain = ResourceEntity.extractDomain(r.url);
+      const targetWsId = domainPrimaries[domain];
+      if (targetWsId && r.workspaceId !== targetWsId) {
+        resourceUpdates.push({ id: r.id, patch: { workspaceId: targetWsId, groupId: undefined } });
+      }
+    });
+    if (resourceUpdates.length > 0) {
+      await ResourceEntity.bulkUpdate(c.env, resourceUpdates);
+    }
+    return ok(c, { updatedCount: resourceUpdates.length });
   });
   app.post('/api/workspaces/:id/auto-organize', async (c) => {
     const id = c.req.param('id');

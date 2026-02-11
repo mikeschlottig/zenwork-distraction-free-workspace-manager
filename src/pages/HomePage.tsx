@@ -12,23 +12,28 @@ export function HomePage() {
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isOrganizing, setIsOrganizing] = useState(false);
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
   );
+  const fetchWorkspaces = async () => {
+    try {
+      const data = await api<Workspace[]>('/api/workspaces');
+      setWorkspaces(data);
+      return data;
+    } catch (err) {
+      console.error('Failed to load workspaces', err);
+      toast.error('Failed to load workspaces');
+      return [];
+    }
+  };
   useEffect(() => {
     const load = async () => {
-      try {
-        const data = await api<Workspace[]>('/api/workspaces');
-        setWorkspaces(data);
-        if (data && data.length > 0) {
-          setActiveId(data[0].id);
-        }
-      } catch (err) {
-        console.error('Failed to load workspaces', err);
-        toast.error('Failed to load workspaces');
-      } finally {
-        setIsLoading(false);
+      const data = await fetchWorkspaces();
+      if (data && data.length > 0) {
+        setActiveId(data[0].id);
       }
+      setIsLoading(false);
     };
     load();
   }, []);
@@ -60,6 +65,19 @@ export function HomePage() {
       toast.success('Workspace deleted');
     } catch (err) {
       toast.error('Failed to delete workspace');
+    }
+  };
+  const handleGlobalOrganize = async () => {
+    setIsOrganizing(true);
+    const toastId = toast.loading('Intelligently organizing resources across spaces...');
+    try {
+      await api('/api/workspaces/auto-organize-all', { method: 'POST' });
+      await fetchWorkspaces();
+      toast.success('Resources auto-sorted to primary spaces', { id: toastId });
+    } catch (err) {
+      toast.error('Organization failed', { id: toastId });
+    } finally {
+      setIsOrganizing(false);
     }
   };
   const handleDragEndGlobal = async (event: DragEndEvent) => {
@@ -100,7 +118,15 @@ export function HomePage() {
   return (
     <DndContext sensors={sensors} onDragEnd={handleDragEndGlobal}>
       <div className="flex h-screen bg-slate-950 text-slate-200 overflow-hidden font-sans">
-        <Sidebar workspaces={workspaces} activeId={activeId} onSelect={setActiveId} onCreate={handleCreateWorkspace} onDelete={handleDeleteWorkspace} />
+        <Sidebar 
+          workspaces={workspaces} 
+          activeId={activeId} 
+          onSelect={setActiveId} 
+          onCreate={handleCreateWorkspace} 
+          onDelete={handleDeleteWorkspace}
+          onGlobalOrganize={handleGlobalOrganize}
+          isOrganizing={isOrganizing}
+        />
         <main className="flex-1 relative overflow-hidden bg-slate-950">
           {activeWorkspace ? (
             <WorkspaceView workspace={activeWorkspace} onUpdate={handleUpdateWorkspace} onDelete={handleDeleteWorkspace} />

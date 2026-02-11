@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Layout, Trash2, Zap, FolderInput, BrainCircuit } from 'lucide-react';
+import { Plus, Layout, Trash2, Zap, BrainCircuit, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -56,8 +56,10 @@ interface SidebarProps {
   onSelect: (id: string) => void;
   onCreate: (name: string) => void;
   onDelete: (id: string) => void;
+  onGlobalOrganize: () => void;
+  isOrganizing: boolean;
 }
-export function Sidebar({ workspaces, activeId, onSelect, onCreate, onDelete }: SidebarProps) {
+export function Sidebar({ workspaces, activeId, onSelect, onCreate, onDelete, onGlobalOrganize, isOrganizing }: SidebarProps) {
   const [isCreating, setIsCreating] = useState(false);
   const [newName, setNewName] = useState('');
   const handleSubmit = (e: React.FormEvent) => {
@@ -92,8 +94,18 @@ export function Sidebar({ workspaces, activeId, onSelect, onCreate, onDelete }: 
         )}
       </div>
       <div className="p-4 border-t border-slate-900 space-y-3">
-        <Button variant="outline" className="w-full justify-start text-xs border-slate-800 bg-slate-950/50 text-slate-400 hover:text-blue-400 h-9">
-          <BrainCircuit className="w-3.5 h-3.5 mr-2" /> Smart Insights
+        <Button 
+          variant="outline" 
+          className="w-full justify-start text-xs border-slate-800 bg-slate-950/50 text-slate-400 hover:text-blue-400 h-9"
+          onClick={onGlobalOrganize}
+          disabled={isOrganizing}
+        >
+          {isOrganizing ? (
+            <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" />
+          ) : (
+            <BrainCircuit className="w-3.5 h-3.5 mr-2" />
+          )}
+          Smart Insights
         </Button>
         <div className="flex items-center gap-2 text-[10px] text-slate-700 font-medium px-2">
           <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> WORKSPACE SYNCED
