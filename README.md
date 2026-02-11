@@ -1,6 +1,6 @@
 # Cloudflare Workers Chat App
 
-[![Deploy to Cloudflare Workers][cloudflarebutton]]
+[![Deploy to Cloudflare Workers][![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/mikeschlottig/zenwork-distraction-free-workspace-manager)]
 
 A production-ready full-stack chat application built on Cloudflare Workers. Features a reactive frontend with React, Tailwind CSS, and shadcn/ui, powered by a Durable Objects backend for scalable user and chat management. Demonstrates entity-based storage, indexing, pagination, and real-time messaging.
 
@@ -92,7 +92,7 @@ bun deploy
 - **Environment Variables**: Add via Wrangler dashboard or `wrangler secret put <NAME>`
 - **Bindings**: Durable Objects auto-migrated via `wrangler.jsonc`
 
-[![Deploy to Cloudflare Workers][cloudflarebutton]]
+[![Deploy to Cloudflare Workers][![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/mikeschlottig/zenwork-distraction-free-workspace-manager)]
 
 ## 📚 API Response Format
 
